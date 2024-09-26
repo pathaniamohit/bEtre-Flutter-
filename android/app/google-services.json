@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "420164508559",
+    "firebase_url": "https://betre-76e37-default-rtdb.firebaseio.com",
+    "project_id": "betre-76e37",
+    "storage_bucket": "betre-76e37.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:420164508559:android:785297d0543f6aa16d09fa",
+        "android_client_info": {
+          "package_name": "com.example.betre"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYqzc6txyKxime_BW8A1XlH5vVKA2GM2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:420164508559:android:b48ca41c7692727a6d09fa",
+        "android_client_info": {
+          "package_name": "com.example.betreflutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYqzc6txyKxime_BW8A1XlH5vVKA2GM2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
