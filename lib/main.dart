@@ -30,6 +30,7 @@ class SignInPage extends StatefulWidget {
 class _SignInPageState extends State<SignInPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -58,15 +59,31 @@ class _SignInPageState extends State<SignInPage> {
               ),
               obscureText: true,
             ),
+            const SizedBox(height: 16.0),
+            TextField(
+              controller: _confirmPasswordController,
+              decoration: const InputDecoration(
+                labelText: 'Confirm Password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
             const SizedBox(height: 20.0),
             ElevatedButton(
               onPressed: () {
-                // Add authentication logic here (Firebase, etc.)
-                // If sign-in is successful:
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MainPage()),
-                );
+                // Check if passwords match before allowing sign in
+                if (_passwordController.text != _confirmPasswordController.text) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text("Passwords do not match!"),
+                  ));
+                } else {
+                  // Add authentication logic here (Firebase, etc.)
+                  // If sign-in is successful:
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MainPage()),
+                  );
+                }
               },
               child: const Text('Sign In'),
             ),
