@@ -4,7 +4,12 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
-
+apply plugin: 'com.google.gms.google-services'
+dependencies {
+    // Add the following line to the dependencies block
+    implementation platform('com.google.firebase:firebase-bom:31.0.0') // Use the latest version
+    implementation 'com.google.firebase:firebase-auth' // or any other Firebase service you use
+}
 android {
     namespace = "com.example.betreflutter"
     compileSdk = flutter.compileSdkVersion
