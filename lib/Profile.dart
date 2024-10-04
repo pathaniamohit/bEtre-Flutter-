@@ -5,6 +5,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'Settings.dart';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -173,7 +174,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: IconButton(
                       icon: Icon(Icons.settings),
                       onPressed: () {
-                        // Navigate to Settings
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => SettingsScreen()),
+                        );
                       },
                     ),
                   ),
