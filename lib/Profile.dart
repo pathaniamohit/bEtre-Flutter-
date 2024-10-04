@@ -55,13 +55,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserStats() async {
     if (_user != null) {
-      // Load followers count
       _dbRef.child("followers").child(_user!.uid).onValue.listen((event) {
         final dataSnapshot = event.snapshot;
         if (dataSnapshot.exists) {
-          int count = dataSnapshot.children.length;
           setState(() {
-            _followersCount = count;
+            _followersCount = dataSnapshot.children.length;
           });
         } else {
           setState(() {
@@ -70,13 +68,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       });
 
-      // Load follows count
       _dbRef.child("following").child(_user!.uid).onValue.listen((event) {
         final dataSnapshot = event.snapshot;
         if (dataSnapshot.exists) {
-          int count = dataSnapshot.children.length;
           setState(() {
-            _followsCount = count;
+            _followsCount = dataSnapshot.children.length;
           });
         } else {
           setState(() {
@@ -85,13 +81,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       });
 
-      // Load photos count
       _dbRef.child("posts").orderByChild("userId").equalTo(_user!.uid).onValue.listen((event) {
         final dataSnapshot = event.snapshot;
         if (dataSnapshot.exists) {
-          int count = dataSnapshot.children.length;
           setState(() {
-            _photosCount = count;
+            _photosCount = dataSnapshot.children.length;
           });
         } else {
           setState(() {
@@ -134,10 +128,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _profileImageUrl = downloadUrl;
         });
 
-        // Show a success toast
         Fluttertoast.showToast(msg: "Profile image updated successfully", gravity: ToastGravity.BOTTOM);
       } catch (e) {
-        // Show a failure toast
         Fluttertoast.showToast(msg: "Failed to upload profile image: $e", gravity: ToastGravity.BOTTOM);
       }
     }
@@ -161,7 +153,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Profile Header Section
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Stack(
@@ -190,7 +181,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // Profile Picture and Info Section
             GestureDetector(
               onTap: _pickImage,
               child: CircleAvatar(
@@ -214,7 +204,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
 
-            // Stats Section (Photos, Followers, Follows)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0),
               child: Row(
@@ -227,18 +216,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // User Posts Grid
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: GridView.builder(
-                physics: NeverScrollableScrollPhysics(), // Disable scrolling in grid view
-                shrinkWrap: true, // Wraps grid view inside SingleChildScrollView
+                physics: NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, // 3 items per row
+                  crossAxisCount: 3,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
-                itemCount: _posts.length, // Number of images
+                itemCount: _posts.length,
                 itemBuilder: (context, index) {
                   return Image.network(_posts[index], fit: BoxFit.cover);
                 },
@@ -250,7 +238,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Helper widget to display stats (Photos, Followers, Follows)
   Widget _buildStatItem(String label, String count) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
