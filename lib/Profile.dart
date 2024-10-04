@@ -171,14 +171,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: Icon(Icons.settings),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => SettingsScreen()),
-                        );
-                      },
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Container(
+                        margin: EdgeInsets.only(right: 10,top: 10),
+                        child: IconButton(
+                          iconSize: 36,
+                          icon: Icon(Icons.settings),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => SettingsScreen()),
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ],
