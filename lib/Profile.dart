@@ -38,6 +38,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadUserProfile() async {
+    if (_user != null) {
+      _dbRef.child("users").child(_user!.uid).once().then((snapshot) {
+        if (snapshot.snapshot.exists) {
+          var userData = Map<String, dynamic>.from(snapshot.snapshot.value as Map);
+          setState(() {
+            _username = userData['username'] ?? 'Username';
+            _email = userData['email'] ?? 'Email';
+            _profileImageUrl = userData['profileImageUrl'];
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _loadUserStats() async {
+    if (_user != null) {
+      // Load followers count
+      _dbRef.child("followers").child(_user!.uid).onValue.listen((event) {
+        final dataSnapshot = event.snapshot;
+        if (dataSnapshot.exists) {
+          int count = dataSnapshot.children.length;
+          setState(() {
+            _followersCount = count;
+          });
+        } else {
+          setState(() {
+            _followersCount = 0;
+          });
+        }
+      });
+
+      // Load follows count
+      _dbRef.child("following").child(_user!.uid).onValue.listen((event) {
+        final dataSnapshot = event.snapshot;
+        if (dataSnapshot.exists) {
+          int count = dataSnapshot.children.length;
+          setState(() {
+            _followsCount = count;
+          });
+        } else {
+          setState(() {
+            _followsCount = 0;
+          });
+        }
+      });
+
+      // Load photos count
+      _dbRef.child("posts").orderByChild("userId").equalTo(_user!.uid).onValue.listen((event) {
+        final dataSnapshot = event.snapshot;
+        if (dataSnapshot.exists) {
+          int count = dataSnapshot.children.length;
+          setState(() {
+            _photosCount = count;
+          });
+        } else {
+          setState(() {
+            _photosCount = 0;
+          });
+        }
+      });
+    }
+  }
 
 
   Future<void> _pickImage() async {
