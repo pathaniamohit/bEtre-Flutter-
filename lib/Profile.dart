@@ -102,6 +102,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadUserPosts() async {
+    if (_user != null) {
+      _dbRef.child("posts").orderByChild("userId").equalTo(_user!.uid).onValue.listen((event) {
+        List<String> posts = [];
+        for (var post in event.snapshot.children) {
+          var postData = post.value as Map;
+          if (postData['imageUrl'] != null) {
+            posts.add(postData['imageUrl']);
+          }
+        }
+        setState(() {
+          _posts = posts;
+        });
+      });
+    }
+  }
+
+  Future<void> _uploadProfileImage(File image) async {
+    if (_user != null) {
+      try {
+        String path = 'users/${_user!.uid}/profile.jpg';
+        TaskSnapshot uploadTask = await _storage.ref(path).putFile(image);
+        String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+        _dbRef.child("users").child(_user!.uid).update({
+          "profileImageUrl": downloadUrl,
+        });
+
+        setState(() {
+          _profileImageUrl = downloadUrl;
+        });
+
+        // Show a success toast
+        Fluttertoast.showToast(msg: "Profile image updated successfully", gravity: ToastGravity.BOTTOM);
+      } catch (e) {
+        // Show a failure toast
+        Fluttertoast.showToast(msg: "Failed to upload profile image: $e", gravity: ToastGravity.BOTTOM);
+      }
+    }
+  }
 
   Future<void> _pickImage() async {
     final ImagePicker _picker = ImagePicker();
