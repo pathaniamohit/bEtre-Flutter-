@@ -112,6 +112,124 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  void _showChangePasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final _currentPasswordController = TextEditingController();
+        final _newPasswordController = TextEditingController();
+        final _confirmPasswordController = TextEditingController();
+
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            padding: const EdgeInsets.all(7),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Update Password",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'RobotoSerif',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildPasswordField("Current Password", _currentPasswordController),
+                const SizedBox(height: 12),
+                _buildPasswordField("New Password", _newPasswordController),
+                const SizedBox(height: 12),
+                _buildPasswordField("Confirm New Password", _confirmPasswordController),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          String currentPassword = _currentPasswordController.text;
+                          String newPassword = _newPasswordController.text;
+                          String confirmPassword = _confirmPasswordController.text;
+
+                          if (newPassword == confirmPassword && newPassword.length >= 6) {
+                            _updatePassword(currentPassword, newPassword);
+                            Navigator.of(context).pop();
+                          } else {
+                            Fluttertoast.showToast(msg: "Passwords do not match or are too short");
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          "Update",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
+  Future<void> _updatePassword(String currentPassword, String newPassword) async {
+    User? user = _auth.currentUser;
+
+    if (user != null) {
+      AuthCredential credential = EmailAuthProvider.credential(email: _user!.email!, password: currentPassword);
+
+      user.reauthenticateWithCredential(credential).then((_) {
+        user.updatePassword(newPassword).then((_) {
+          Fluttertoast.showToast(msg: "Password updated successfully");
+        }).catchError((error) {
+          Fluttertoast.showToast(msg: "Failed to update password: $error");
+        });
+      }).catchError((error) {
+        Fluttertoast.showToast(msg: "Failed to re-authenticate: $error");
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,14 +257,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   backgroundImage: _profileImageUrl != null
                       ? NetworkImage(_profileImageUrl!)
                       : AssetImage('assets/profile_placeholder.png') as ImageProvider,
-                  child: Align(
+                  child: const Align(
                     alignment: Alignment.bottomRight,
                     child: Icon(Icons.camera_alt, size: 24, color: Colors.white),
                   ),
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
+              const SizedBox(height: 8),
+              const Text(
                 'Change Picture',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'RobotoSerif'),
               ),
@@ -173,9 +291,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'RobotoSerif'),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'RobotoSerif'),
         ),
-        SizedBox(height: 5),
+        const SizedBox(height: 5),
         SizedBox(
           width: double.infinity,
           child: TextField(
@@ -204,6 +322,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           padding: EdgeInsets.symmetric(vertical: 15),
         ),
         child: Text(label, style: TextStyle(fontSize: 16, color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField(String hintText, TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      obscureText: true,
+      decoration: InputDecoration(
+        hintText: hintText,
+        suffixIcon: Icon(Icons.visibility_outlined),
+        contentPadding: EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
       ),
     );
   }
