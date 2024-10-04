@@ -34,6 +34,84 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _loadUserProfile() async {
+    if (_user != null) {
+      _dbRef.child("users").child(_user!.uid).once().then((snapshot) {
+        if (snapshot.snapshot.exists) {
+          var userData = Map<String, dynamic>.from(snapshot.snapshot.value as Map);
+          setState(() {
+            _username = userData['username'] ?? 'Username';
+            _email = userData['email'] ?? 'Email';
+            _profileImageUrl = userData['profileImageUrl'];
+            _phone = userData['phone'] ?? 'Phone Number';
+          });
+          _usernameController.text = _username;
+          _phoneController.text = _phone;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker _picker = ImagePicker();
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _image = File(image.path);
+      });
+      _uploadProfileImage(_image!);
+    }
+  }
+
+  Future<void> _uploadProfileImage(File image) async {
+    if (_user != null) {
+      try {
+        String path = 'users/${_user!.uid}/profile.jpg';
+        TaskSnapshot uploadTask = await _storage.ref(path).putFile(image);
+        String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+        _dbRef.child("users").child(_user!.uid).update({
+          "profileImageUrl": downloadUrl,
+        });
+
+        setState(() {
+          _profileImageUrl = downloadUrl;
+        });
+
+        Fluttertoast.showToast(msg: "Profile image updated successfully", gravity: ToastGravity.BOTTOM);
+      } catch (e) {
+        Fluttertoast.showToast(msg: "Failed to upload profile image: $e", gravity: ToastGravity.BOTTOM);
+      }
+    }
+  }
+
+  Future<void> _updateUserProfile() async {
+    if (_user != null) {
+      String newUsername = _usernameController.text.trim();
+      String newPhone = _phoneController.text.trim();
+
+      if (newUsername.isEmpty || newUsername.length < 3) {
+        Fluttertoast.showToast(msg: "Username must be at least 3 characters long");
+        return;
+      }
+
+      if (newPhone.isEmpty || newPhone.length != 10) {
+        Fluttertoast.showToast(msg: "Phone number must be 10 digits");
+        return;
+      }
+
+      _dbRef.child("users").child(_user!.uid).update({
+        "username": newUsername,
+        "phone": newPhone,
+      }).then((_) {
+        Fluttertoast.showToast(msg: "Profile updated successfully", gravity: ToastGravity.BOTTOM);
+      }).catchError((error) {
+        Fluttertoast.showToast(msg: "Failed to update profile: $error", gravity: ToastGravity.BOTTOM);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
