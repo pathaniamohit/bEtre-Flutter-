@@ -57,7 +57,53 @@ class _CreateScreenState extends State<CreateScreen> {
     }
   }
 
-  
+  Future<void> _createPost() async {
+    String content = _postContentController.text.trim();
+
+    if (content.isEmpty) {
+      Fluttertoast.showToast(msg: "Content cannot be empty");
+      return;
+    }
+
+    if (_selectedImage == null) {
+      Fluttertoast.showToast(msg: "Please select an image");
+      return;
+    }
+
+    if (_selectedLocation.isEmpty) {
+      Fluttertoast.showToast(msg: "Please add a location");
+      return;
+    }
+
+    String userId = _user!.uid;
+    String fileName = 'posts/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    TaskSnapshot uploadTask = await _storage.ref(fileName).putFile(_selectedImage!);
+    String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+    Map<String, dynamic> postData = {
+      'userId': userId,
+      'username': _username,
+      'content': content,
+      'location': _selectedLocation,
+      'imageUrl': downloadUrl,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    _dbRef.push().set(postData).then((_) {
+      Fluttertoast.showToast(msg: "Post created successfully");
+      _resetFields();
+    }).catchError((error) {
+      Fluttertoast.showToast(msg: "Failed to create post: $error");
+    });
+  }
+
+  void _resetFields() {
+    setState(() {
+      _postContentController.clear();
+      _selectedImage = null;
+      _selectedLocation = "";
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
