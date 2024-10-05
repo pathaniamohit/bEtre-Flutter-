@@ -125,15 +125,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.9,
-            padding: const EdgeInsets.all(7),
+            width: MediaQuery.of(context).size.width * 0.95,
+            padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   "Update Password",
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'RobotoSerif',
                   ),
@@ -157,7 +157,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          padding: EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: const Text(
                           "Cancel",
@@ -169,7 +169,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -210,7 +210,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       },
     );
   }
-
 
   Future<void> _updatePassword(String currentPassword, String newPassword) async {
     User? user = _auth.currentUser;
@@ -327,15 +326,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _buildPasswordField(String hintText, TextEditingController controller) {
-    return TextField(
-      controller: controller,
-      obscureText: true,
-      decoration: InputDecoration(
-        hintText: hintText,
-        suffixIcon: Icon(Icons.visibility_outlined),
-        contentPadding: EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
+    return SizedBox(
+      width: double.infinity,
+      child: TextField(
+        controller: controller,
+        obscureText: true,
+        decoration: InputDecoration(
+          hintText: hintText,
+          suffixIcon: Icon(Icons.visibility_outlined),
+          contentPadding: EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       ),
     );
