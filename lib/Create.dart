@@ -46,6 +46,19 @@ class _CreateScreenState extends State<CreateScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final ImagePicker _picker = ImagePicker();
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+    }
+  }
+
+  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
