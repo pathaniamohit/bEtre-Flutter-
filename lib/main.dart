@@ -23,6 +23,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'bEtre',
       theme: ThemeData(
+        fontFamily: 'RobotoSerif',
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontFamily: 'RobotoSerif', fontWeight: FontWeight.w400),
+          bodyMedium: TextStyle(fontFamily: 'RobotoSerif', fontWeight: FontWeight.w400),
+          displayLarge: TextStyle(fontFamily: 'RobotoSerif', fontWeight: FontWeight.w400),
+        ),
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
