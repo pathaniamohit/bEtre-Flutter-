@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'EditProfile.dart';
 import 'About.dart';
 import 'AccountPreferences.dart';
+import 'LoginScreen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -116,7 +117,10 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () {
                 _auth.signOut();
                 Navigator.of(context).pop();
-                Navigator.of(context).pushReplacementNamed('/login');
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => LoginPage()),
+                      (Route<dynamic> route) => false,
+                );
               },
               child: const Text("Yes"),
             ),
