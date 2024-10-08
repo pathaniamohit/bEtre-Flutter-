@@ -50,10 +50,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildPostHeader(userData, post),
-                Image.network(post['imageUrl']),
+                if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)  // Ensure the image URL exists and is not empty
+                  Image.network(post['imageUrl']),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(post['content']),
+                  child: Text(post['content'] ?? 'No content'),  // Fallback to 'No content' if content is null
                 ),
                 _buildPostFooter(post),
               ],
@@ -68,9 +69,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _buildPostHeader(Map<dynamic, dynamic> userData, Map<dynamic, dynamic> post) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundImage: NetworkImage(userData['profilePictureUrl']),
+        backgroundImage: userData['profilePictureUrl'] != null && userData['profilePictureUrl'].isNotEmpty
+            ? NetworkImage(userData['profilePictureUrl'])
+            : AssetImage('assets/default_profile.png'),
       ),
-      title: Text(userData['username']),
+      title: Text(userData['username'] ?? 'Unknown User'),
       subtitle: Text(post['location'] ?? 'Unknown Location'),
       trailing: ElevatedButton(
         onPressed: () => _followUser(post['userId']),
@@ -84,20 +87,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         IconButton(
-          icon: Icon(Icons.favorite, color: post['isLiked'] ? Colors.red : Colors.grey),
+          icon: Icon(Icons.favorite, color: post['isLiked'] == true ? Colors.red : Colors.grey),
           onPressed: () => _toggleLike(post),
         ),
         IconButton(
           icon: Icon(Icons.comment),
           onPressed: () => _navigateToComments(post),
         ),
-        Text('${post['count_like']} Likes'),
-        Text('${post['count_comment']} Comments'),
+        Text('${post['count_like'] ?? 0} Likes'),  // Fallback to 0 if count_like is null
+        Text('${post['count_comment'] ?? 0} Comments'),  // Fallback to 0 if count_comment is null
       ],
     );
   }
 
   void _followUser(String userId) {
+    // Add logic to follow the user
   }
 
   void _toggleLike(Map<dynamic, dynamic> post) {
@@ -112,5 +116,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _navigateToComments(Map<dynamic, dynamic> post) {
+    // Add navigation logic to comments screen
   }
 }

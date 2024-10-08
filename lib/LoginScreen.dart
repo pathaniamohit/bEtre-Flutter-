@@ -50,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/login_background.png'),
+            image: AssetImage('assets/login_image.jpg'),
             fit: BoxFit.cover,
           ),
         ),

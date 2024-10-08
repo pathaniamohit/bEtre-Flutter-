@@ -52,7 +52,7 @@ class _SignupPageState extends State<SignupPage> {
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/signup_background.png'),
+            image: AssetImage('assets/sign1.jpg'),
             fit: BoxFit.cover,
           ),
         ),
