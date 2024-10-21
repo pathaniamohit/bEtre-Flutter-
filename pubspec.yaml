@@ -31,12 +31,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.15.0
-  firebase_auth: ^4.8.1
-  firebase_storage: ^11.2.1
-  firebase_database: ^10.3.1
-  image_picker: ^0.8.4+4
-  fluttertoast: ^8.0.9
+  firebase_core: ^2.16.0  # Updated Firebase Core
+  firebase_auth: ^4.9.1   # Updated Firebase Auth
+  firebase_database: ^10.4.0  # Updated Firebase Database
+  firebase_storage: ^11.4.0  # Updated Firebase Storage
+  image_picker: ^0.8.7+3  # Updated Image Picker
+  fluttertoast: ^8.2.1    # Updated FlutterToast
+  flutter_google_places: ^0.3.0  # Updated Google Places
+  google_maps_flutter: ^2.2.2    # Updated Google Maps
+  google_maps_webservice: ^0.0.20-nullsafety.2  # Latest Google Maps Web Service
+  geocoding: ^2.1.0  # Latest Geocoding
 
 
   # The following adds the Cupertino Icons font to your application.

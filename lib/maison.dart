@@ -17,7 +17,7 @@ class _MaisonScreenState extends State<MaisonScreen> {
 
   static final List<Widget> _screens = <Widget>[
     ExploreScreen(),
-    SearchScreen(),
+    SearchUserScreen(),
     CreateScreen(),
     InboxScreen(),
     ProfileScreen(),
