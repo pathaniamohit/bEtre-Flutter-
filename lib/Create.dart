@@ -5,6 +5,13 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_google_places/flutter_google_places.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_webservice/places.dart';
+import 'package:geocoding/geocoding.dart';
+
+const kGoogleApiKey = "AIzaSyDCjCxf0f11NcCZVrR5XZLxT_xrNdmO7";
+GoogleMapsPlaces _places = GoogleMapsPlaces(apiKey: kGoogleApiKey);
 
 class CreateScreen extends StatefulWidget {
   @override
@@ -21,6 +28,7 @@ class _CreateScreenState extends State<CreateScreen> {
   String _username = "Username";
   File? _selectedImage;
   String _selectedLocation = "";
+  LatLng? _selectedLatLng; // Store selected latitude and longitude
   final _postContentController = TextEditingController();
 
   @override
@@ -34,15 +42,18 @@ class _CreateScreenState extends State<CreateScreen> {
 
   Future<void> _loadUserProfile() async {
     if (_user != null) {
-      _dbRef.child("users").child(_user!.uid).once().then((snapshot) {
-        if (snapshot.snapshot.exists) {
-          var userData = Map<String, dynamic>.from(snapshot.snapshot.value as Map);
+      try {
+        DataSnapshot snapshot = await _dbRef.child("users").child(_user!.uid).get();
+        if (snapshot.exists) {
+          var userData = Map<String, dynamic>.from(snapshot.value as Map);
           setState(() {
             _username = userData['username'] ?? 'Username';
             _profileImageUrl = userData['profileImageUrl'];
           });
         }
-      });
+      } catch (error) {
+        Fluttertoast.showToast(msg: "Error loading profile: $error");
+      }
     }
   }
 
@@ -54,80 +65,51 @@ class _CreateScreenState extends State<CreateScreen> {
       setState(() {
         _selectedImage = File(image.path);
       });
+    } else {
+      Fluttertoast.showToast(msg: "No image selected");
     }
   }
 
   Future<void> _showLocationDialog() async {
-    TextEditingController _locationController = TextEditingController();
+    try {
+      // Add a loading indicator or print logs to debug the location dialog
+      print('Location search started');
+      Prediction? prediction = await PlacesAutocomplete.show(
+        context: context,
+        apiKey: kGoogleApiKey,
+        mode: Mode.overlay,
+        language: "en",
+        components: [Component(Component.country, "us")], // Change "us" to your country if needed
+      );
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Title
-                const Text(
-                  'Enter Location',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'RobotoSerif',
-                  ),
-                ),
-                const SizedBox(height: 16),
+      if (prediction != null) {
+        print('Place selected: ${prediction.description}');
+        PlacesDetailsResponse detail = await _places.getDetailsByPlaceId(prediction.placeId!);
+        double lat = detail.result.geometry!.location.lat;
+        double lng = detail.result.geometry!.location.lng;
 
-                TextField(
-                  controller: _locationController,
-                  decoration: InputDecoration(
-                    hintText: 'Location',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-                  ),
-                ),
-                const SizedBox(height: 24),
+        setState(() {
+          _selectedLocation = prediction.description!;
+          _selectedLatLng = LatLng(lat, lng);
+        });
+      }
+    } catch (error) {
+      print('Error in location selection: $error');
+      Fluttertoast.showToast(msg: "Error selecting location: $error");
+    }
+  }
 
-                SizedBox(
-                  width: double.infinity,  // Full width button
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedLocation = _locationController.text;
-                      });
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child: const Text(
-                      'Continue',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'RobotoSerif',
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  Future<String> _getAddressFromLatLng(LatLng position) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        return "${place.locality}, ${place.administrativeArea}, ${place.country}";
+      }
+    } catch (error) {
+      Fluttertoast.showToast(msg: "Error getting address: $error");
+    }
+    return "Unknown location";
   }
 
   Future<void> _createPost() async {
@@ -143,31 +125,41 @@ class _CreateScreenState extends State<CreateScreen> {
       return;
     }
 
-    if (_selectedLocation.isEmpty) {
+    if (_selectedLatLng == null) {
       Fluttertoast.showToast(msg: "Please add a location");
       return;
     }
 
-    String userId = _user!.uid;
-    String fileName = 'posts/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    TaskSnapshot uploadTask = await _storage.ref(fileName).putFile(_selectedImage!);
-    String downloadUrl = await uploadTask.ref.getDownloadURL();
+    try {
+      String userId = _user!.uid;
+      String fileName = 'posts/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    Map<String, dynamic> postData = {
-      'userId': userId,
-      'username': _username,
-      'content': content,
-      'location': _selectedLocation,
-      'imageUrl': downloadUrl,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    };
+      // Upload image to Firebase Storage
+      TaskSnapshot uploadTask = await _storage.ref(fileName).putFile(_selectedImage!);
+      String downloadUrl = await uploadTask.ref.getDownloadURL();
 
-    _dbRef.push().set(postData).then((_) {
+      // Get a readable address from the LatLng
+      String address = await _getAddressFromLatLng(_selectedLatLng!);
+
+      // Create post data
+      Map<String, dynamic> postData = {
+        'userId': userId,
+        'username': _username,
+        'content': content,
+        'location': address,
+        'imageUrl': downloadUrl,
+        'latitude': _selectedLatLng!.latitude,
+        'longitude': _selectedLatLng!.longitude,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      await _dbRef.push().set(postData);
       Fluttertoast.showToast(msg: "Post created successfully");
       _resetFields();
-    }).catchError((error) {
+
+    } catch (error) {
       Fluttertoast.showToast(msg: "Failed to create post: $error");
-    });
+    }
   }
 
   void _resetFields() {
