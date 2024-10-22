@@ -25,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _followersCount = 0;
   int _followsCount = 0;
 
-  List<String> _posts = [];
+  List<Map<String, dynamic>> _posts = []; // Modify to store post details
   File? _image;
 
   @override
@@ -100,17 +100,118 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadUserPosts() async {
     if (_user != null) {
       _dbRef.child("posts").orderByChild("userId").equalTo(_user!.uid).onValue.listen((event) {
-        List<String> posts = [];
+        List<Map<String, dynamic>> posts = [];
         for (var post in event.snapshot.children) {
-          var postData = post.value as Map;
-          if (postData['imageUrl'] != null) {
-            posts.add(postData['imageUrl']);
-          }
+          var postData = Map<String, dynamic>.from(post.value as Map);
+          postData['postId'] = post.key; // Store post ID for later use
+          posts.add(postData);
         }
         setState(() {
           _posts = posts;
         });
       });
+    }
+  }
+
+  // Triple-tap to delete a post
+  Future<void> _onPostTripleTap(String postId) async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Delete Post'),
+          content: Text('Are you sure you want to delete this post?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _deletePost(postId);
+                Navigator.pop(context);
+              },
+              child: Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deletePost(String postId) async {
+    if (_user != null) {
+      await _dbRef.child("posts").child(postId).remove();
+      Fluttertoast.showToast(msg: "Post deleted successfully", gravity: ToastGravity.BOTTOM);
+    }
+  }
+
+  // Double-tap to edit post
+  Future<void> _onPostDoubleTap(String postId, String currentContent) async {
+    TextEditingController _contentController = TextEditingController(text: currentContent);
+    File? selectedImage;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Edit Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _contentController,
+                decoration: InputDecoration(labelText: 'Edit Content'),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () async {
+                  final ImagePicker _picker = ImagePicker();
+                  final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                  if (image != null) {
+                    selectedImage = File(image.path);
+                    Fluttertoast.showToast(msg: "Image selected", gravity: ToastGravity.BOTTOM);
+                  }
+                },
+                child: Text("Change Image"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _updatePost(postId, _contentController.text.trim(), selectedImage);
+                Navigator.pop(context);
+              },
+              child: Text('Update'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _updatePost(String postId, String newContent, File? newImage) async {
+    if (_user != null) {
+      Map<String, dynamic> updatedData = {"content": newContent};
+
+      if (newImage != null) {
+        String path = 'posts/${_user!.uid}/${postId}.jpg';
+        TaskSnapshot uploadTask = await _storage.ref(path).putFile(newImage);
+        String downloadUrl = await uploadTask.ref.getDownloadURL();
+        updatedData['imageUrl'] = downloadUrl;
+      }
+
+      await _dbRef.child("posts").child(postId).update(updatedData);
+      Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
     }
   }
 
@@ -239,7 +340,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 itemCount: _posts.length,
                 itemBuilder: (context, index) {
-                  return Image.network(_posts[index], fit: BoxFit.cover);
+                  final post = _posts[index];
+                  return GestureDetector(
+                    onDoubleTap: () => _onPostDoubleTap(post['postId'], post['content']),
+                    onLongPress: () => _onPostTripleTap(post['postId']),
+                    child: Image.network(post['imageUrl'], fit: BoxFit.cover),
+                  );
                 },
               ),
             ),
