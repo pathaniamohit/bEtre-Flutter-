@@ -10,7 +10,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_webservice/places.dart';
 import 'package:geocoding/geocoding.dart';
 
-const kGoogleApiKey = "AIzaSyDCjCxf0f11NcCZVrR5XZLxT_xrNdmO7";
+const kGoogleApiKey = "AIzaSyDCjCxf0f11NcCZVrR5XZLxT_xrNdmO7-8";
 GoogleMapsPlaces _places = GoogleMapsPlaces(apiKey: kGoogleApiKey);
 
 class CreateScreen extends StatefulWidget {
@@ -20,7 +20,7 @@ class CreateScreen extends StatefulWidget {
 
 class _CreateScreenState extends State<CreateScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _dbRef = FirebaseDatabase.instance.reference().child('posts');
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref().child('posts');
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   User? _user;

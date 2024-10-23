@@ -59,7 +59,7 @@ class _MaisonScreenState extends State<MaisonScreen> {
             ),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: Colors.deepPurple,
+          selectedItemColor: Colors.black,
           unselectedItemColor: Colors.grey,
           iconSize: 30,
           selectedFontSize: 16,

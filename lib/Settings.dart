@@ -11,7 +11,7 @@ import 'LoginScreen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _database = FirebaseDatabase.instance.reference();
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
   final Reference _storage = FirebaseStorage.instance.ref().child('profile_pictures');
 
   @override
@@ -118,7 +118,7 @@ class SettingsScreen extends StatelessWidget {
                 _auth.signOut();
                 Navigator.of(context).pop();
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => LoginPage()),
+                  MaterialPageRoute(builder: (context) => LoginScreen()),
                       (Route<dynamic> route) => false,
                 );
               },
