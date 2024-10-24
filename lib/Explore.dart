@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'CommentScreen.dart';
 
 class ExploreScreen extends StatefulWidget {
   @override
@@ -9,32 +12,61 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   final DatabaseReference _postRef = FirebaseDatabase.instance.ref().child('posts');
   final DatabaseReference _userRef = FirebaseDatabase.instance.ref().child('users');
+  final DatabaseReference _followingRef = FirebaseDatabase.instance.ref().child('following');
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  List<Map<dynamic, dynamic>> _posts = [];
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = _auth.currentUser;
+    // _loadFollowedUsersPosts();
+    _loadExplorePosts();
+  }
+
+  Future<void> _loadExplorePosts() async {
+    _postRef.onValue.listen((event) {
+      if (event.snapshot.exists) {
+        Map<dynamic, dynamic> postsData = event.snapshot.value as Map<dynamic, dynamic>;
+        List<Map<dynamic, dynamic>> explorePosts = [];
+
+        postsData.forEach((key, value) {
+          Map<dynamic, dynamic> post = Map<dynamic, dynamic>.from(value);
+          post['postId'] = key;
+
+
+          if (post['userId'] != _currentUser!.uid) {
+            explorePosts.add(post);
+          }
+        });
+
+        setState(() {
+          _posts = explorePosts;
+        });
+      }
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Explore'),
         centerTitle: true,
       ),
-      body: StreamBuilder(
-        stream: _postRef.onValue,
-        builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-          if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
-            Map<dynamic, dynamic> posts = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-            List<dynamic> postList = posts.values.toList();
-
-            return ListView.builder(
-              itemCount: postList.length,
-              itemBuilder: (context, index) {
-                var post = postList[index];
-                return _buildPostCard(post);
-              },
-            );
-          }
-          return Center(child: CircularProgressIndicator());
+      body: _posts.isNotEmpty
+          ? ListView.builder(
+        itemCount: _posts.length,
+        itemBuilder: (context, index) {
+          var post = _posts[index];
+          return _buildPostCard(post);
         },
-      ),
+      )
+          : Center(child: Text('No posts to show')),
     );
   }
 
@@ -50,11 +82,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildPostHeader(userData, post),
-                if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)  // Ensure the image URL exists and is not empty
+                if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)
                   Image.network(post['imageUrl']),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(post['content'] ?? 'No content'),  // Fallback to 'No content' if content is null
+                  child: Text(post['content'] ?? 'No content'),
                 ),
                 _buildPostFooter(post),
               ],
@@ -69,9 +101,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _buildPostHeader(Map<dynamic, dynamic> userData, Map<dynamic, dynamic> post) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundImage: userData['profilePictureUrl'] != null && userData['profilePictureUrl'].isNotEmpty
-            ? NetworkImage(userData['profilePictureUrl'])
-            : AssetImage('assets/default_profile.png'),
+        backgroundImage: userData['profileImageUrl'] != null && userData['profileImageUrl'].isNotEmpty
+            ? NetworkImage(userData['profileImageUrl'])
+            : AssetImage('assets/profile_placeholder.png') as ImageProvider,
       ),
       title: Text(userData['username'] ?? 'Unknown User'),
       subtitle: Text(post['location'] ?? 'Unknown Location'),
@@ -94,8 +126,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           icon: Icon(Icons.comment),
           onPressed: () => _navigateToComments(post),
         ),
-        Text('${post['count_like'] ?? 0} Likes'),  // Fallback to 0 if count_like is null
-        Text('${post['count_comment'] ?? 0} Comments'),  // Fallback to 0 if count_comment is null
+        Text('${post['count_like'] ?? 0} Likes'),
+        Text('${post['count_comment'] ?? 0} Comments'),
       ],
     );
   }
@@ -115,7 +147,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
   }
 
+
+
   void _navigateToComments(Map<dynamic, dynamic> post) {
-    // Add navigation logic to comments screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentScreen(postId: post['postId']),
+      ),
+    );
   }
+
 }
+
