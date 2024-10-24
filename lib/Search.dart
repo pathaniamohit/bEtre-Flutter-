@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'OtherUserProfileScreen.dart'; // Add this import
 
 class SearchUserScreen extends StatefulWidget {
   @override
@@ -9,15 +12,73 @@ class SearchUserScreen extends StatefulWidget {
 class _SearchUserScreenState extends State<SearchUserScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<dynamic, dynamic>> _users = [];
-  List<String> _userImages = []; // List to hold user images
+  List<Map<dynamic, dynamic>> _posts = [];
   bool _isLoading = false;
 
-  // Method to search users
+  @override
+  void initState() {
+    super.initState();
+    _fetchAllPosts(); // Fetch all posts when the screen initializes
+  }
+
+  Future<void> _fetchAllPosts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Fetch the current user
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Fetch the list of users the current user is following
+      DatabaseReference followingRef = FirebaseDatabase.instance.ref('following/${currentUser.uid}');
+      DataSnapshot followingSnapshot = await followingRef.get();
+
+      List<String> followedUserIds = [];
+      if (followingSnapshot.exists) {
+        followingSnapshot.children.forEach((child) {
+          followedUserIds.add(child.key!); // Get followed user IDs
+        });
+      }
+
+      // Fetch all posts
+      DatabaseReference postsRef = FirebaseDatabase.instance.ref('posts');
+      DataSnapshot snapshot = await postsRef.get();
+
+      if (snapshot.exists) {
+        Map<dynamic, dynamic> postsData = snapshot.value as Map<dynamic, dynamic>;
+        List<Map<dynamic, dynamic>> allPosts = [];
+
+        postsData.forEach((key, value) {
+          Map<dynamic, dynamic> post = Map<dynamic, dynamic>.from(value);
+
+          // Exclude the current user's posts and followed users' posts
+          if (post['userId'] != currentUser.uid && !followedUserIds.contains(post['userId'])) {
+            post['postId'] = key;
+            allPosts.add(post);
+          }
+        });
+
+        setState(() {
+          _posts = allPosts;
+        });
+      } else {
+        print("No posts found in Firebase");
+      }
+    } catch (e) {
+      print("Error fetching posts: $e");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _searchUsers() async {
     setState(() {
       _isLoading = true;
-      _users = []; // Clear previous results
-      _userImages = []; // Clear previous images
+      _users = [];
     });
 
     try {
@@ -26,25 +87,16 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
         DatabaseReference userRef = FirebaseDatabase.instance.ref('users');
         DataSnapshot snapshot = await userRef.get();
 
-        // Check if data is present
         if (snapshot.exists) {
-          Map<dynamic, dynamic>? userData = snapshot.value as Map<dynamic, dynamic>?;
-          print('User data found: $userData'); // Debugging
+          Map<dynamic, dynamic> userData = snapshot.value as Map<dynamic, dynamic>;
 
-          if (userData != null) {
-            // Filter users based on the search query
-            for (MapEntry<dynamic, dynamic> entry in userData.entries) {
-              if (entry.value['name'].toString().toLowerCase().contains(query.toLowerCase())) {
-                print('User matched: ${entry.value['name']}'); // Debugging
-                _users.add(entry.value); // Add matching users
-
-                // Fetch images for the matched user
-                await _fetchUserImages(entry.key);
-              }
+          userData.forEach((key, value) {
+            if (value['username'].toString().toLowerCase().contains(query.toLowerCase())) {
+              Map<dynamic, dynamic> user = Map<dynamic, dynamic>.from(value);
+              user['uid'] = key;
+              _users.add(user);
             }
-          }
-        } else {
-          print("No users found in Firebase");
+          });
         }
       }
     } catch (e) {
@@ -56,30 +108,66 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     }
   }
 
-  // Method to fetch user images
-  Future<void> _fetchUserImages(String userId) async {
-    try {
-      DatabaseReference postsRef = FirebaseDatabase.instance.ref('users/$userId/posts');
-      DataSnapshot snapshot = await postsRef.get();
+  void _navigateToUserProfile(String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OtherUserProfileScreen(userId: userId),
+      ),
+    );
+  }
 
-      if (snapshot.exists) {
-        Map<dynamic, dynamic>? postsData = snapshot.value as Map<dynamic, dynamic>?;
-        print('Posts data for $userId: $postsData'); // Debugging
 
-        if (postsData != null) {
-          postsData.forEach((key, value) {
-            if (value['imageUrl'] != null) {
-              _userImages.add(value['imageUrl']); // Add image URLs to the list
-              print('Image added: ${value['imageUrl']}'); // Debugging
-            }
-          });
+  Widget _buildPostCard(Map<dynamic, dynamic> post) {
+    return FutureBuilder(
+      future: FirebaseDatabase.instance.ref('users/${post['userId']}').get(),
+      builder: (context, AsyncSnapshot<DataSnapshot> snapshot) {
+        if (snapshot.hasData && snapshot.data!.value != null) {
+          Map<dynamic, dynamic> userData = snapshot.data!.value as Map<dynamic, dynamic>;
+          return Card(
+            margin: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: userData['profileImageUrl'] != null
+                        ? NetworkImage(userData['profileImageUrl'])
+                        : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+                  ),
+                  title: Text(userData['username'] ?? 'Unknown User'),
+                  subtitle: Text(post['location'] ?? ''),
+                ),
+                if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)
+                  Image.network(post['imageUrl']),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(post['content'] ?? ''),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.favorite_border),
+                      onPressed: () {
+                        // Implement like functionality
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.comment),
+                      onPressed: () {
+                        // Implement comment functionality
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
         }
-      } else {
-        print('No posts found for user: $userId');
-      }
-    } catch (e) {
-      print("Error fetching user images: $e");
-    }
+        return SizedBox.shrink();
+      },
+    );
   }
 
   @override
@@ -88,14 +176,16 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
       appBar: AppBar(
         title: Text('Search Users'),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(16.0),
+            child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by name...',
+                hintText: 'Search by username...',
                 suffixIcon: IconButton(
                   icon: Icon(Icons.search),
                   onPressed: _searchUsers,
@@ -103,34 +193,38 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-            SizedBox(height: 20),
-            _isLoading
-                ? CircularProgressIndicator()
-                : Expanded(
-              child: _userImages.isNotEmpty
-                  ? GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, // Number of columns in grid
-                  childAspectRatio: 1, // Aspect ratio for grid items
-                ),
-                itemCount: _userImages.length,
-                itemBuilder: (context, index) {
-                  return Card(
-                    child: Image.network(
-                      _userImages[index],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Center(child: Text('Image not found'));
-                      },
-                    ),
-                  );
-                },
-              )
-                  : Center(child: Text('No images found for this user.')),
-            ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: _users.isNotEmpty
+                ? ListView.builder(
+              itemCount: _users.length,
+              itemBuilder: (context, index) {
+                var user = _users[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: user['profileImageUrl'] != null
+                        ? NetworkImage(user['profileImageUrl'])
+                        : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+                  ),
+                  title: Text(user['username']),
+                  subtitle: Text(user['email']),
+                  onTap: () => _navigateToUserProfile(user['uid']),
+                );
+              },
+            )
+                : _posts.isNotEmpty
+                ? ListView.builder(
+              itemCount: _posts.length,
+              itemBuilder: (context, index) {
+                var post = _posts[index];
+                return _buildPostCard(post);
+              },
+            )
+                : Center(child: Text('No posts found.')),
+          ),
+        ],
       ),
     );
   }
 }
+
