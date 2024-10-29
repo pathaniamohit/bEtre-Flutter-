@@ -25,6 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _photosCount = 0;
   int _followersCount = 0;
   int _followsCount = 0;
+  String _bio = '';
 
   List<Map<String, dynamic>> _posts = []; // Modify to store post details
   File? _image;
@@ -49,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _username = userData['username'] ?? 'Username';
             _email = userData['email'] ?? 'Email';
             _profileImageUrl = userData['profileImageUrl'];
+            _bio = userData['bio'] ?? '';
           });
         }
       });
@@ -372,6 +374,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _email,
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
+
+            if (_bio.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Text(
+                  _bio,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
 
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0),
