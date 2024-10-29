@@ -35,14 +35,12 @@ dependencies:
   firebase_auth: ^5.3.1   # Updated Firebase Auth
   firebase_database: ^11.1.4  # Updated Firebase Database
   firebase_storage: ^12.3.4 # Updated Firebase Storage
-  image_picker: ^0.8.7+3  # Updated Image Picker
-  fluttertoast: ^8.2.1    # Updated FlutterToast
-  flutter_google_places: ^0.3.0  # Updated Google Places
-  google_maps_flutter: ^2.2.2    # Updated Google Maps
-  google_maps_webservice: ^0.0.20-nullsafety.2  # Latest Google Maps Web Service
-  geocoding: ^2.1.0  # Latest Geocoding
-
-
+  image_picker: ^0.8.4+4
+  flutter_google_places: ^0.3.0  # You may adjust the version as needed
+  google_maps_webservice: ^0.0.20-nullsafety.5
+  fluttertoast: ^8.0.9
+  google_maps_flutter: ^2.1.1  # You may update this version if there's a newer compatible one.
+  geocoding: ^2.0.5  # Update this to the latest compatible version as well.
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
