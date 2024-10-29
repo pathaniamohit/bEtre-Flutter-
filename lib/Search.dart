@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-import 'OtherUserProfileScreen.dart'; // Add this import
+import 'CommentScreen.dart';
+import 'OtherUserProfileScreen.dart';
 
 class SearchUserScreen extends StatefulWidget {
   @override
@@ -10,15 +10,39 @@ class SearchUserScreen extends StatefulWidget {
 }
 
 class _SearchUserScreenState extends State<SearchUserScreen> {
+  final DatabaseReference _postRef = FirebaseDatabase.instance.ref().child('posts');
   final TextEditingController _searchController = TextEditingController();
   List<Map<dynamic, dynamic>> _users = [];
   List<Map<dynamic, dynamic>> _posts = [];
   bool _isLoading = false;
 
+  User? _currentUser;
+  Set<String> _followingUserIds = {}; // To store the user IDs the current user is following
+
   @override
   void initState() {
     super.initState();
-    _fetchAllPosts(); // Fetch all posts when the screen initializes
+    _currentUser = FirebaseAuth.instance.currentUser;
+    _fetchFollowingUsers(); // Fetch the list of users the current user is following
+  }
+
+  Future<void> _fetchFollowingUsers() async {
+    if (_currentUser == null) return;
+
+    DatabaseReference followingRef = FirebaseDatabase.instance.ref('following/${_currentUser!.uid}');
+    followingRef.onValue.listen((event) {
+      if (event.snapshot.exists) {
+        setState(() {
+          _followingUserIds = event.snapshot.children.map((child) => child.key!).toSet();
+        });
+      } else {
+        setState(() {
+          _followingUserIds = {};
+        });
+      }
+      // After updating the following list, fetch the posts again
+      _fetchAllPosts();
+    });
   }
 
   Future<void> _fetchAllPosts() async {
@@ -27,20 +51,7 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     });
 
     try {
-      // Fetch the current user
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
-
-      // Fetch the list of users the current user is following
-      DatabaseReference followingRef = FirebaseDatabase.instance.ref('following/${currentUser.uid}');
-      DataSnapshot followingSnapshot = await followingRef.get();
-
-      List<String> followedUserIds = [];
-      if (followingSnapshot.exists) {
-        followingSnapshot.children.forEach((child) {
-          followedUserIds.add(child.key!); // Get followed user IDs
-        });
-      }
+      if (_currentUser == null) return;
 
       // Fetch all posts
       DatabaseReference postsRef = FirebaseDatabase.instance.ref('posts');
@@ -52,10 +63,10 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
 
         postsData.forEach((key, value) {
           Map<dynamic, dynamic> post = Map<dynamic, dynamic>.from(value);
+          post['postId'] = key;
 
-          // Exclude the current user's posts and followed users' posts
-          if (post['userId'] != currentUser.uid && !followedUserIds.contains(post['userId'])) {
-            post['postId'] = key;
+          // Exclude the current user's posts and posts from users the current user is following
+          if (post['userId'] != _currentUser!.uid && !_followingUserIds.contains(post['userId'])) {
             allPosts.add(post);
           }
         });
@@ -65,6 +76,9 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
         });
       } else {
         print("No posts found in Firebase");
+        setState(() {
+          _posts = [];
+        });
       }
     } catch (e) {
       print("Error fetching posts: $e");
@@ -89,13 +103,19 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
 
         if (snapshot.exists) {
           Map<dynamic, dynamic> userData = snapshot.value as Map<dynamic, dynamic>;
+          List<Map<dynamic, dynamic>> usersList = [];
 
           userData.forEach((key, value) {
-            if (value['username'].toString().toLowerCase().contains(query.toLowerCase())) {
+            if (value['username'].toString().toLowerCase().contains(query.toLowerCase())
+                && key != _currentUser!.uid) {
               Map<dynamic, dynamic> user = Map<dynamic, dynamic>.from(value);
               user['uid'] = key;
-              _users.add(user);
+              usersList.add(user);
             }
+          });
+
+          setState(() {
+            _users = usersList;
           });
         }
       }
@@ -117,6 +137,37 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     );
   }
 
+  Future<void> _followUser(String userId) async {
+    if (_currentUser == null) return;
+
+    DatabaseReference followingRef = FirebaseDatabase.instance.ref('following/${_currentUser!.uid}/$userId');
+    DatabaseReference followersRef = FirebaseDatabase.instance.ref('followers/$userId/${_currentUser!.uid}');
+
+    await followingRef.set(true);
+    await followersRef.set(true);
+
+    setState(() {
+      _followingUserIds.add(userId);
+      // Remove the user's posts from the _posts list
+      _posts.removeWhere((post) => post['userId'] == userId);
+    });
+  }
+
+  Future<void> _unfollowUser(String userId) async {
+    if (_currentUser == null) return;
+
+    DatabaseReference followingRef = FirebaseDatabase.instance.ref('following/${_currentUser!.uid}/$userId');
+    DatabaseReference followersRef = FirebaseDatabase.instance.ref('followers/$userId/${_currentUser!.uid}');
+
+    await followingRef.remove();
+    await followersRef.remove();
+
+    setState(() {
+      _followingUserIds.remove(userId);
+      // Re-fetch the posts to include the unfollowed user's posts
+      _fetchAllPosts();
+    });
+  }
 
   Widget _buildPostCard(Map<dynamic, dynamic> post) {
     return FutureBuilder(
@@ -124,6 +175,28 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
       builder: (context, AsyncSnapshot<DataSnapshot> snapshot) {
         if (snapshot.hasData && snapshot.data!.value != null) {
           Map<dynamic, dynamic> userData = snapshot.data!.value as Map<dynamic, dynamic>;
+          String postUserId = post['userId'];
+
+          // Check if the current user has liked the post
+          bool isLiked = false;
+          int likesCount = 0;
+          if (post['likes'] != null) {
+            Map<dynamic, dynamic> likesMap = post['likes'];
+            likesCount = likesMap.length;
+            isLiked = likesMap.containsKey(_currentUser!.uid);
+          }
+          post['isLiked'] = isLiked;
+          post['likesCount'] = likesCount;
+
+          // Get comments count
+          int commentsCount = 0;
+          if (post['comments'] != null) {
+            commentsCount = (post['comments'] as Map<dynamic, dynamic>).length;
+          }
+          post['commentsCount'] = commentsCount;
+
+          bool isFollowing = _followingUserIds.contains(postUserId);
+
           return Card(
             margin: const EdgeInsets.all(8),
             child: Column(
@@ -137,6 +210,16 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                   ),
                   title: Text(userData['username'] ?? 'Unknown User'),
                   subtitle: Text(post['location'] ?? ''),
+                  trailing: ElevatedButton(
+                    onPressed: () {
+                      if (isFollowing) {
+                        _unfollowUser(postUserId);
+                      } else {
+                        _followUser(postUserId);
+                      }
+                    },
+                    child: Text(isFollowing ? 'Unfollow' : 'Follow'),
+                  ),
                 ),
                 if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)
                   Image.network(post['imageUrl']),
@@ -144,29 +227,84 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                   padding: const EdgeInsets.all(8.0),
                   child: Text(post['content'] ?? ''),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.favorite_border),
-                      onPressed: () {
-                        // Implement like functionality
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.comment),
-                      onPressed: () {
-                        // Implement comment functionality
-                      },
-                    ),
-                  ],
-                ),
+                _buildPostFooter(post),
               ],
             ),
           );
         }
         return SizedBox.shrink();
       },
+    );
+  }
+
+  Widget _buildPostFooter(Map<dynamic, dynamic> post) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        IconButton(
+          icon: Icon(Icons.favorite, color: post['isLiked'] == true ? Colors.red : Colors.grey),
+          onPressed: () => _toggleLike(post),
+        ),
+        IconButton(
+          icon: Icon(Icons.comment),
+          onPressed: () => _navigateToComments(post),
+        ),
+        Text('${post['likesCount'] ?? 0} Likes'),
+        Text('${post['commentsCount'] ?? 0} Comments'),
+      ],
+    );
+  }
+
+  void _toggleLike(Map<dynamic, dynamic> post) async {
+    final postId = post['postId'];
+    final userId = _currentUser!.uid;
+    final likesRef = _postRef.child(postId).child('likes');
+    final userLikeRef = likesRef.child(userId);
+
+    final DataSnapshot snapshot = await userLikeRef.get();
+    bool isLiked = snapshot.exists;
+
+    if (isLiked) {
+      // Unlike the post
+      await userLikeRef.remove();
+      // Update local post data
+      setState(() {
+        post['isLiked'] = false;
+        post['likesCount'] = (post['likesCount'] ?? 1) - 1;
+      });
+    } else {
+      // Like the post
+      await userLikeRef.set(true);
+      // Notify the post owner
+      _notifyPostOwner(post, 'liked your post');
+      // Update local post data
+      setState(() {
+        post['isLiked'] = true;
+        post['likesCount'] = (post['likesCount'] ?? 0) + 1;
+      });
+    }
+  }
+
+  void _notifyPostOwner(Map<dynamic, dynamic> post, String action) async {
+    final postOwnerId = post['userId'];
+    final currentUserId = _currentUser!.uid;
+    if (postOwnerId == currentUserId) return; // Don't notify if the user is liking their own post
+
+    final inboxRef = FirebaseDatabase.instance.ref().child('inbox').child(postOwnerId);
+    await inboxRef.push().set({
+      'fromUserId': currentUserId,
+      'action': action,
+      'postId': post['postId'],
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  void _navigateToComments(Map<dynamic, dynamic> post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId']),
+      ),
     );
   }
 
@@ -200,16 +338,7 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
               itemCount: _users.length,
               itemBuilder: (context, index) {
                 var user = _users[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: user['profileImageUrl'] != null
-                        ? NetworkImage(user['profileImageUrl'])
-                        : AssetImage('assets/profile_placeholder.png') as ImageProvider,
-                  ),
-                  title: Text(user['username']),
-                  subtitle: Text(user['email']),
-                  onTap: () => _navigateToUserProfile(user['uid']),
-                );
+                return _buildUserListTile(user);
               },
             )
                 : _posts.isNotEmpty
@@ -226,5 +355,21 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
       ),
     );
   }
-}
 
+  Widget _buildUserListTile(Map<dynamic, dynamic> user) {
+    String userId = user['uid'];
+    // Removed the isFollowing check since we are not showing the follow/unfollow button here
+
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: user['profileImageUrl'] != null
+            ? NetworkImage(user['profileImageUrl'])
+            : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+      ),
+      title: Text(user['username']),
+      subtitle: Text(user['email']),
+
+      onTap: () => _navigateToUserProfile(userId),
+    );
+  }
+}
