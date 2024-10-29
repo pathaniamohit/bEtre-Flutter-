@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'package:betreflutter/CommentScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'PostDetailScreen.dart';
 import 'Settings.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _photosCount = 0;
   int _followersCount = 0;
   int _followsCount = 0;
+  String _bio = '';
 
   List<Map<String, dynamic>> _posts = []; // Modify to store post details
   File? _image;
@@ -97,13 +100,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+
   Future<void> _loadUserPosts() async {
     if (_user != null) {
-      _dbRef.child("posts").orderByChild("userId").equalTo(_user!.uid).onValue.listen((event) {
+      _dbRef
+          .child("posts")
+          .orderByChild("userId")
+          .equalTo(_user!.uid)
+          .onValue
+          .listen((event) {
         List<Map<String, dynamic>> posts = [];
         for (var post in event.snapshot.children) {
           var postData = Map<String, dynamic>.from(post.value as Map);
           postData['postId'] = post.key; // Store post ID for later use
+
+          // Get likes
+          int likesCount = 0;
+          bool isLikedByCurrentUser = false;
+          if (postData['likes'] != null) {
+            Map<dynamic, dynamic> likesMap = postData['likes'];
+            likesCount = likesMap.length;
+            if (likesMap.containsKey(_user!.uid)) {
+              isLikedByCurrentUser = true;
+            }
+          }
+          postData['likesCount'] = likesCount;
+          postData['isLikedByCurrentUser'] = isLikedByCurrentUser;
+
+          // Get comments count
+          int commentsCount = 0;
+          if (postData['comments'] != null) {
+            Map<dynamic, dynamic> commentsMap = postData['comments'];
+            commentsCount = commentsMap.length;
+          }
+          postData['commentsCount'] = commentsCount;
+
           posts.add(postData);
         }
         setState(() {
@@ -113,7 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Triple-tap to delete a post
+
   Future<void> _onPostTripleTap(String postId) async {
     showDialog(
       context: context,
@@ -148,7 +179,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Double-tap to edit post
+
+
   Future<void> _onPostDoubleTap(String postId, String currentContent) async {
     TextEditingController _contentController = TextEditingController(text: currentContent);
     File? selectedImage;
@@ -199,6 +231,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+
+
   Future<void> _updatePost(String postId, String newContent, File? newImage) async {
     if (_user != null) {
       Map<String, dynamic> updatedData = {"content": newContent};
@@ -214,6 +248,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
     }
   }
+
+
+  Future<void> _toggleLike(String postId, bool isCurrentlyLiked) async {
+    if (_user != null) {
+      DatabaseReference likesRef = _dbRef.child("posts").child(postId).child("likes").child(_user!.uid);
+      if (isCurrentlyLiked) {
+        // Unlike the post
+        await likesRef.remove();
+      } else {
+        // Like the post
+        await likesRef.set(true);
+      }
+    }
+  }
+
 
   Future<void> _uploadProfileImage(File image) async {
     if (_user != null) {
@@ -249,6 +298,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _viewPostDetails(Map<String, dynamic> post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => PostDetailScreen(post: post, currentUser: _user)),
+    );
+  }
+
+  void _navigateToComments(Map<dynamic, dynamic> post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentScreen(
+          postId: post['postId'],
+          postOwnerId: post['userId'], // Pass the post owner's ID
+        ),
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -270,6 +339,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
+
+
                   Align(
                     alignment: Alignment.centerRight,
                     child: Padding(
@@ -328,6 +399,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
+            // Padding(
+            //   padding: const EdgeInsets.all(16.0),
+            //   child: GridView.builder(
+            //     physics: NeverScrollableScrollPhysics(),
+            //     shrinkWrap: true,
+            //     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            //       crossAxisCount: 3,
+            //       crossAxisSpacing: 10,
+            //       mainAxisSpacing: 10,
+            //       childAspectRatio: 1, // Ensures each grid item is square
+            //     ),
+            //     itemCount: _posts.length,
+            //     itemBuilder: (context, index) {
+            //       final post = _posts[index];
+            //       return GestureDetector(
+            //         onTap: () => _viewPostDetails(post),
+            //         child: Container(
+            //           decoration: BoxDecoration(
+            //             border: Border.all(color: Colors.grey.shade300),
+            //             color: Colors.black12,
+            //           ),
+            //           child: Stack(
+            //             fit: StackFit.expand,
+            //             children: [
+            //               Image.network(
+            //                 post['imageUrl'],
+            //                 fit: BoxFit.cover,
+            //               ),
+            //               Positioned(
+            //                 bottom: 4,
+            //                 left: 4,
+            //                 child: Container(
+            //                   padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            //                   color: Colors.black54,
+            //                   child: Row(
+            //                     children: [
+            //                       Icon(
+            //                         Icons.favorite,
+            //                         color: Colors.redAccent,
+            //                         size: 16,
+            //                       ),
+            //                       SizedBox(width: 2),
+            //                       Text(
+            //                         '${post['likesCount']}',
+            //                         style: TextStyle(color: Colors.white, fontSize: 12),
+            //                       ),
+            //                       SizedBox(width: 8),
+            //                       Icon(
+            //                         Icons.comment,
+            //                         color: Colors.white,
+            //                         size: 16,
+            //                       ),
+            //                       SizedBox(width: 2),
+            //                       Text(
+            //                         '${post['commentsCount']}',
+            //                         style: TextStyle(color: Colors.white, fontSize: 12),
+            //                       ),
+            //
+            //                     ],
+            //                   ),
+            //                 ),
+            //               ),
+            //             ],
+            //           ),
+            //         ),
+            //       );
+            //     },
+            //   ),
+            // ),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: GridView.builder(
@@ -337,18 +477,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisCount: 3,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
+                  childAspectRatio: 1, // Ensures each grid item is square
                 ),
                 itemCount: _posts.length,
                 itemBuilder: (context, index) {
                   final post = _posts[index];
                   return GestureDetector(
-                    onDoubleTap: () => _onPostDoubleTap(post['postId'], post['content']),
-                    onLongPress: () => _onPostTripleTap(post['postId']),
-                    child: Image.network(post['imageUrl'], fit: BoxFit.cover),
+                    onTap: () => _viewPostDetails(post),
+                    onDoubleTap: () => _onPostDoubleTap(post['postId'], post['content']), // Edit post
+                    onLongPress: () => _onPostTripleTap(post['postId']), // Delete post
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        color: Colors.black12,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            post['imageUrl'],
+                            fit: BoxFit.cover,
+                          ),
+                          Positioned(
+                            bottom: 4,
+                            left: 4,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              color: Colors.black54,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.favorite,
+                                    color: Colors.redAccent,
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    '${post['likesCount']}',
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Icon(
+                                    Icons.comment,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    '${post['commentsCount']}',
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
-            ),
+            )
+
           ],
         ),
       ),
@@ -365,4 +555,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
+
+  Widget _buildRecentActivity() {
+    List<Widget> activityWidgets = [];
+
+    for (var post in _posts) {
+      // Fetch comments from other users
+      if (post['comments'] != null) {
+        post['comments'].forEach((commentId, commentData) {
+          if (commentData['userId'] != _user!.uid) {
+            activityWidgets.add(ListTile(
+              leading: Icon(Icons.comment),
+              title: Text('User ${commentData['userId']} commented on your post'),
+              subtitle: Text(commentData['content']),
+              onTap: () => _viewPostDetails(post),
+            ));
+          }
+        });
+      }
+
+      // Fetch likes from other users
+      if (post['likes'] != null) {
+        post['likes'].forEach((userId, _) {
+          if (userId != _user!.uid) {
+            activityWidgets.add(ListTile(
+              leading: Icon(Icons.favorite),
+              title: Text('User $userId liked your post'),
+              onTap: () => _viewPostDetails(post),
+            ));
+          }
+        });
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: activityWidgets,
+    );
+  }
+
 }
+

@@ -20,7 +20,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: 3.5.1
+  sdk: ">=3.5.1 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -41,6 +41,8 @@ dependencies:
   google_maps_flutter: ^2.2.2    # Updated Google Maps
   google_maps_webservice: ^0.0.20-nullsafety.2  # Latest Google Maps Web Service
   geocoding: ^2.1.0  # Latest Geocoding
+  google_place: ^0.4.7
+  geolocator: ^9.0.2
 
 
   # The following adds the Cupertino Icons font to your application.
