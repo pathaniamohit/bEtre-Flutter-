@@ -17,42 +17,62 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   List<Map<dynamic, dynamic>> _posts = [];
   User? _currentUser;
+  Set<String> _followingUserIds = {}; // Store the IDs of users the current user follows
 
   @override
   void initState() {
     super.initState();
     _currentUser = _auth.currentUser;
-    // _loadFollowedUsersPosts();
-    _loadExplorePosts();
+    if (_currentUser != null) {
+      _fetchFollowingUsers(); // Fetch followed users first
+    }
   }
 
-  Future<void> _loadExplorePosts() async {
-    _postRef.onValue.listen((event) {
+  Future<void> _fetchFollowingUsers() async {
+    DatabaseReference followingRef = _followingRef.child(_currentUser!.uid);
+    followingRef.onValue.listen((event) {
       if (event.snapshot.exists) {
-        Map<dynamic, dynamic> postsData = event.snapshot.value as Map<dynamic, dynamic>;
-        List<Map<dynamic, dynamic>> explorePosts = [];
-
-        postsData.forEach((key, value) {
-          Map<dynamic, dynamic> post = Map<dynamic, dynamic>.from(value);
-          post['postId'] = key;
-
-
-          if (post['userId'] != _currentUser!.uid) {
-            explorePosts.add(post);
-          }
-        });
-
         setState(() {
-          _posts = explorePosts;
+          _followingUserIds = event.snapshot.children.map((e) => e.key.toString()).toSet();
+        });
+        _loadFollowedUsersPosts();
+      } else {
+        setState(() {
+          _followingUserIds = {};
+          _posts = []; // No followed users, so clear posts
         });
       }
     });
   }
 
+  Future<void> _loadFollowedUsersPosts() async {
+    _postRef.onValue.listen((event) {
+      if (event.snapshot.exists) {
+        Map<dynamic, dynamic> postsData = event.snapshot.value as Map<dynamic, dynamic>;
+        List<Map<dynamic, dynamic>> followedPosts = [];
+
+        postsData.forEach((key, value) {
+          Map<dynamic, dynamic> post = Map<dynamic, dynamic>.from(value);
+          post['postId'] = key;
+
+          if (_followingUserIds.contains(post['userId'])) {
+            followedPosts.add(post);
+          }
+        });
+
+        setState(() {
+          _posts = followedPosts;
+        });
+      } else {
+        setState(() {
+          _posts = [];
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         title: Text('Explore'),
@@ -76,6 +96,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
       builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
         if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
           Map<dynamic, dynamic> userData = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+
+          // Check if the current user has liked the post
+          bool isLiked = false;
+          int likesCount = 0;
+          if (post['likes'] != null) {
+            Map<dynamic, dynamic> likesMap = post['likes'];
+            likesCount = likesMap.length;
+            isLiked = likesMap.containsKey(_currentUser!.uid);
+          }
+          post['isLiked'] = isLiked;
+          post['likesCount'] = likesCount;
+
+          // Get comments count
+          int commentsCount = 0;
+          if (post['comments'] != null) {
+            commentsCount = (post['comments'] as Map<dynamic, dynamic>).length;
+          }
+          post['commentsCount'] = commentsCount;
+
           return Card(
             margin: const EdgeInsets.all(10),
             child: Column(
@@ -107,10 +146,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
       title: Text(userData['username'] ?? 'Unknown User'),
       subtitle: Text(post['location'] ?? 'Unknown Location'),
-      trailing: ElevatedButton(
-        onPressed: () => _followUser(post['userId']),
-        child: Text('Follow'),
-      ),
     );
   }
 
@@ -126,37 +161,62 @@ class _ExploreScreenState extends State<ExploreScreen> {
           icon: Icon(Icons.comment),
           onPressed: () => _navigateToComments(post),
         ),
-        Text('${post['count_like'] ?? 0} Likes'),
-        Text('${post['count_comment'] ?? 0} Comments'),
+        Text('${post['likesCount'] ?? 0} Likes'),
+        Text('${post['commentsCount'] ?? 0} Comments'),
       ],
     );
   }
 
-  void _followUser(String userId) {
-    // Add logic to follow the user
+  void _toggleLike(Map<dynamic, dynamic> post) async {
+    final postId = post['postId'];
+    final userId = _currentUser!.uid;
+    final likesRef = _postRef.child(postId).child('likes');
+    final userLikeRef = likesRef.child(userId);
+
+    final DataSnapshot snapshot = await userLikeRef.get();
+    bool isLiked = snapshot.exists;
+
+    if (isLiked) {
+      // Unlike the post
+      await userLikeRef.remove();
+      // Update local post data
+      setState(() {
+        post['isLiked'] = false;
+        post['likesCount'] = (post['likesCount'] ?? 1) - 1;
+      });
+    } else {
+      // Like the post
+      await userLikeRef.set(true);
+      // Notify the post owner
+      _notifyPostOwner(post, 'liked your post');
+      // Update local post data
+      setState(() {
+        post['isLiked'] = true;
+        post['likesCount'] = (post['likesCount'] ?? 0) + 1;
+      });
+    }
   }
 
-  void _toggleLike(Map<dynamic, dynamic> post) {
-    final postId = post['postId'];
-    final isLiked = post['isLiked'] ?? false;
-    int likeCount = post['count_like'] ?? 0;
+  void _notifyPostOwner(Map<dynamic, dynamic> post, String action) async {
+    final postOwnerId = post['userId'];
+    final currentUserId = _currentUser!.uid;
+    if (postOwnerId == currentUserId) return; // Don't notify if the user is liking their own post
 
-    _postRef.child(postId).update({
-      'isLiked': !isLiked,
-      'count_like': isLiked ? likeCount - 1 : likeCount + 1,
+    final inboxRef = FirebaseDatabase.instance.ref().child('inbox').child(postOwnerId);
+    await inboxRef.push().set({
+      'fromUserId': currentUserId,
+      'action': action,
+      'postId': post['postId'],
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
   }
-
-
 
   void _navigateToComments(Map<dynamic, dynamic> post) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CommentScreen(postId: post['postId']),
+        builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId']),
       ),
     );
   }
-
 }
-
