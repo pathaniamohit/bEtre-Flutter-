@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'Settings.dart';
+import 'dart:async';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -27,6 +28,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<Map<String, dynamic>> _posts = []; // Modify to store post details
   File? _image;
+  int _tapCount = 0;
+  Timer? _tapTimer;
 
   @override
   void initState() {
@@ -113,7 +116,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Triple-tap to delete a post
   Future<void> _onPostTripleTap(String postId) async {
     showDialog(
       context: context,
@@ -148,7 +150,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Double-tap to edit post
   Future<void> _onPostDoubleTap(String postId, String currentContent) async {
     TextEditingController _contentController = TextEditingController(text: currentContent);
     File? selectedImage;
@@ -213,6 +214,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _dbRef.child("posts").child(postId).update(updatedData);
       Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
     }
+  }
+
+  void _onPostTap(String postId, String currentContent) {
+    _tapCount++;
+    if (_tapTimer != null && _tapTimer!.isActive) {
+      _tapTimer!.cancel(); // Cancel previous timer if still active
+    }
+    _tapTimer = Timer(Duration(milliseconds: 300), () {
+      if (_tapCount == 2) {
+        _onPostDoubleTap(postId, currentContent);
+      } else if (_tapCount == 3) {
+        _onPostTripleTap(postId);
+      }
+      _tapCount = 0; // Reset tap count
+    });
   }
 
   Future<void> _uploadProfileImage(File image) async {
@@ -342,8 +358,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 itemBuilder: (context, index) {
                   final post = _posts[index];
                   return GestureDetector(
-                    onDoubleTap: () => _onPostDoubleTap(post['postId'], post['content']),
-                    onLongPress: () => _onPostTripleTap(post['postId']),
+                    onTap: () => _onPostTap(post['postId'], post['content']),
                     child: Image.network(post['imageUrl'], fit: BoxFit.cover),
                   );
                 },
