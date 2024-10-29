@@ -41,6 +41,8 @@ dependencies:
   google_maps_flutter: ^2.2.2    # Updated Google Maps
   google_maps_webservice: ^0.0.20-nullsafety.2  # Latest Google Maps Web Service
   geocoding: ^2.1.0  # Latest Geocoding
+  google_place: ^0.4.7
+  geolocator: ^9.0.2
 
 
   # The following adds the Cupertino Icons font to your application.
