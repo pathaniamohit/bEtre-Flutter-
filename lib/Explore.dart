@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -9,6 +10,29 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   final DatabaseReference _postRef = FirebaseDatabase.instance.ref().child('posts');
   final DatabaseReference _userRef = FirebaseDatabase.instance.ref().child('users');
+  final DatabaseReference _followingRef = FirebaseDatabase.instance.ref().child('following');
+
+  User? _currentUser = FirebaseAuth.instance.currentUser;
+  List<String> _followedUserIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowedUsers();
+  }
+
+  Future<void> _loadFollowedUsers() async {
+    if (_currentUser == null) return;
+
+    _followingRef.child(_currentUser!.uid).onValue.listen((event) {
+      if (event.snapshot.value != null) {
+        final Map<dynamic, dynamic> followedUsersMap = event.snapshot.value as Map<dynamic, dynamic>;
+        setState(() {
+          _followedUserIds = followedUsersMap.keys.cast<String>().toList();
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +46,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
         builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
           if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
             Map<dynamic, dynamic> posts = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-            List<dynamic> postList = posts.values.toList();
+
+            // Filter posts to include only those from followed users
+            List<dynamic> postList = posts.values.where((post) {
+              return _followedUserIds.contains(post['userId']);
+            }).toList();
+
+            if (postList.isEmpty) {
+              return Center(child: Text("No posts available from followed users."));
+            }
 
             return ListView.builder(
               itemCount: postList.length,
@@ -50,11 +82,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildPostHeader(userData, post),
-                if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)  // Ensure the image URL exists and is not empty
+                if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)
                   Image.network(post['imageUrl']),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(post['content'] ?? 'No content'),  // Fallback to 'No content' if content is null
+                  child: Text(post['content'] ?? 'No content'),
                 ),
                 _buildPostFooter(post),
               ],
@@ -94,8 +126,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           icon: Icon(Icons.comment),
           onPressed: () => _navigateToComments(post),
         ),
-        Text('${post['count_like'] ?? 0} Likes'),  // Fallback to 0 if count_like is null
-        Text('${post['count_comment'] ?? 0} Comments'),  // Fallback to 0 if count_comment is null
+        Text('${post['count_like'] ?? 0} Likes'),
+        Text('${post['count_comment'] ?? 0} Comments'),
       ],
     );
   }
