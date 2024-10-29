@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:betreflutter/CommentScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -50,7 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _username = userData['username'] ?? 'Username';
             _email = userData['email'] ?? 'Email';
             _profileImageUrl = userData['profileImageUrl'];
-            _bio = userData['bio'] ?? '';
           });
         }
       });
@@ -305,6 +305,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _navigateToComments(Map<dynamic, dynamic> post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentScreen(
+          postId: post['postId'],
+          postOwnerId: post['userId'], // Pass the post owner's ID
+        ),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -375,16 +387,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
 
-            if (_bio.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Text(
-                  _bio,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0),
               child: Row(
@@ -397,6 +399,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
+            // Padding(
+            //   padding: const EdgeInsets.all(16.0),
+            //   child: GridView.builder(
+            //     physics: NeverScrollableScrollPhysics(),
+            //     shrinkWrap: true,
+            //     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            //       crossAxisCount: 3,
+            //       crossAxisSpacing: 10,
+            //       mainAxisSpacing: 10,
+            //       childAspectRatio: 1, // Ensures each grid item is square
+            //     ),
+            //     itemCount: _posts.length,
+            //     itemBuilder: (context, index) {
+            //       final post = _posts[index];
+            //       return GestureDetector(
+            //         onTap: () => _viewPostDetails(post),
+            //         child: Container(
+            //           decoration: BoxDecoration(
+            //             border: Border.all(color: Colors.grey.shade300),
+            //             color: Colors.black12,
+            //           ),
+            //           child: Stack(
+            //             fit: StackFit.expand,
+            //             children: [
+            //               Image.network(
+            //                 post['imageUrl'],
+            //                 fit: BoxFit.cover,
+            //               ),
+            //               Positioned(
+            //                 bottom: 4,
+            //                 left: 4,
+            //                 child: Container(
+            //                   padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            //                   color: Colors.black54,
+            //                   child: Row(
+            //                     children: [
+            //                       Icon(
+            //                         Icons.favorite,
+            //                         color: Colors.redAccent,
+            //                         size: 16,
+            //                       ),
+            //                       SizedBox(width: 2),
+            //                       Text(
+            //                         '${post['likesCount']}',
+            //                         style: TextStyle(color: Colors.white, fontSize: 12),
+            //                       ),
+            //                       SizedBox(width: 8),
+            //                       Icon(
+            //                         Icons.comment,
+            //                         color: Colors.white,
+            //                         size: 16,
+            //                       ),
+            //                       SizedBox(width: 2),
+            //                       Text(
+            //                         '${post['commentsCount']}',
+            //                         style: TextStyle(color: Colors.white, fontSize: 12),
+            //                       ),
+            //
+            //                     ],
+            //                   ),
+            //                 ),
+            //               ),
+            //             ],
+            //           ),
+            //         ),
+            //       );
+            //     },
+            //   ),
+            // ),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: GridView.builder(
@@ -413,6 +484,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   final post = _posts[index];
                   return GestureDetector(
                     onTap: () => _viewPostDetails(post),
+                    onDoubleTap: () => _onPostDoubleTap(post['postId'], post['content']), // Edit post
+                    onLongPress: () => _onPostTripleTap(post['postId']), // Delete post
                     child: Container(
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade300),
@@ -464,7 +537,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 },
               ),
-            ),
+            )
+
           ],
         ),
       ),
