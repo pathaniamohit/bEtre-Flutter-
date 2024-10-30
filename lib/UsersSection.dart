@@ -11,13 +11,21 @@ class UsersSection extends StatefulWidget {
 }
 
 class _UsersSectionState extends State<UsersSection> {
-  String _searchQuery = ""; // Holds the search query input
+  String _searchQuery = "";
+
+  Future<void> toggleSuspension(String userId, bool suspended) async {
+    try {
+      await widget.dbRef.child('users').child(userId).update({'suspended': suspended});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(suspended ? 'User suspended' : 'User unsuspended')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating suspension: $e')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Search bar
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextField(
@@ -30,13 +38,11 @@ class _UsersSectionState extends State<UsersSection> {
             ),
             onChanged: (value) {
               setState(() {
-                _searchQuery = value.toLowerCase(); // Update search query
+                _searchQuery = value.toLowerCase();
               });
             },
           ),
         ),
-
-        // User data
         Expanded(
           child: StreamBuilder(
             stream: widget.dbRef.child('users').onValue,
@@ -51,7 +57,6 @@ class _UsersSectionState extends State<UsersSection> {
 
               final data = Map<String, dynamic>.from((snapshot.data! as DatabaseEvent).snapshot.value as Map);
 
-              // Filter users based on search query
               final filteredData = data.entries.where((entry) {
                 final userData = Map<String, dynamic>.from(entry.value);
                 final username = userData['username']?.toLowerCase() ?? '';
@@ -63,20 +68,16 @@ class _UsersSectionState extends State<UsersSection> {
                 return Center(child: Text("No users match your search."));
               }
 
-              return DataTable(
-                columns: const [
-                  DataColumn(label: Text('Username')),
-                  DataColumn(label: Text('Email')),
-                  DataColumn(label: Text('Role')),
-                ],
-                rows: filteredData.map((entry) {
+              return ListView(
+                children: filteredData.map((entry) {
                   final userData = Map<String, dynamic>.from(entry.value);
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(userData['username'] ?? 'Unknown')),
-                      DataCell(Text(userData['email'] ?? 'No email')),
-                      DataCell(Text(userData['role'] ?? 'user')),
-                    ],
+                  return ListTile(
+                    title: Text(userData['username'] ?? 'Unknown'),
+                    subtitle: Text(userData['email'] ?? 'No email'),
+                    trailing: IconButton(
+                      icon: Icon(userData['suspended'] == true ? Icons.lock : Icons.lock_open),
+                      onPressed: () => toggleSuspension(entry.key, userData['suspended'] != true),
+                    ),
                   );
                 }).toList(),
               );
