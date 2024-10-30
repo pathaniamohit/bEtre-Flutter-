@@ -22,8 +22,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String _email = "Email";
   String _phone = "Phone Number";
   File? _image;
+  String _bio = '';
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _bioController = TextEditingController();
 
   @override
   void initState() {
@@ -44,9 +46,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _email = userData['email'] ?? 'Email';
             _profileImageUrl = userData['profileImageUrl'];
             _phone = userData['phone'] ?? 'Phone Number';
+            _bio = userData['bio'] ?? '';
           });
           _usernameController.text = _username;
           _phoneController.text = _phone;
+          _bioController.text = _bio;
         }
       });
     }
@@ -90,6 +94,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_user != null) {
       String newUsername = _usernameController.text.trim();
       String newPhone = _phoneController.text.trim();
+      String newBio = _bioController.text.trim();
 
       if (newUsername.isEmpty || newUsername.length < 3) {
         Fluttertoast.showToast(msg: "Username must be at least 3 characters long");
@@ -104,6 +109,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _dbRef.child("users").child(_user!.uid).update({
         "username": newUsername,
         "phone": newPhone,
+        "bio": newBio,
       }).then((_) {
         Fluttertoast.showToast(msg: "Profile updated successfully", gravity: ToastGravity.BOTTOM);
       }).catchError((error) {
@@ -273,6 +279,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _buildInputField("E-mail Address", TextEditingController(text: _email), isReadOnly: true),
               SizedBox(height: 16),
               _buildInputField("Phone Number", _phoneController),
+              SizedBox(height: 16),
+              _buildInputField("Bio", _bioController, maxLines: 3),
               SizedBox(height: 24),
               _buildActionButton("Change Password", _showChangePasswordDialog),
               SizedBox(height: 12),
@@ -284,7 +292,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller, {bool isReadOnly = false}) {
+  Widget _buildInputField(String label, TextEditingController controller, {bool isReadOnly = false, int maxLines = 1}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -298,6 +306,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: TextField(
             controller: controller,
             readOnly: isReadOnly,
+            maxLines: maxLines,
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
