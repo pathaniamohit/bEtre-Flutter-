@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+import 'CommentsScreen.dart';
+
 class ExploreScreen extends StatefulWidget {
   @override
   _ExploreScreenState createState() => _ExploreScreenState();
@@ -24,6 +26,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _loadFollowedUsers() async {
     if (_currentUser == null) return;
 
+    // Fetch the list of followed user IDs
     _followingRef.child(_currentUser!.uid).onValue.listen((event) {
       if (event.snapshot.value != null) {
         final Map<dynamic, dynamic> followedUsersMap = event.snapshot.value as Map<dynamic, dynamic>;
@@ -103,13 +106,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
       leading: CircleAvatar(
         backgroundImage: userData['profilePictureUrl'] != null && userData['profilePictureUrl'].isNotEmpty
             ? NetworkImage(userData['profilePictureUrl'])
-            : AssetImage('assets/default_profile.png'),
+            : AssetImage('assets/default_profile.png') as ImageProvider,
       ),
       title: Text(userData['username'] ?? 'Unknown User'),
       subtitle: Text(post['location'] ?? 'Unknown Location'),
-      trailing: ElevatedButton(
-        onPressed: () => _followUser(post['userId']),
-        child: Text('Follow'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.flag),
+            onPressed: () => _reportPost(post['postId']),
+            tooltip: 'Report Post',
+          ),
+        ],
       ),
     );
   }
@@ -132,8 +141,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  void _followUser(String userId) {
-    // Add logic to follow the user
+  void _reportPost(String postId) {
+    _postRef.child(postId).update({'is_reported': true});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Post reported for review')),
+    );
   }
 
   void _toggleLike(Map<dynamic, dynamic> post) {
@@ -148,6 +160,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _navigateToComments(Map<dynamic, dynamic> post) {
-    // Add navigation logic to comments screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentsScreen(postId: post['postId']),
+      ),
+    );
   }
 }
