@@ -39,19 +39,36 @@ class _LoginScreenState extends State<LoginScreen> {
 
       User? user = _auth.currentUser;
       if (user != null) {
-        final userRoleRef = _dbRef.child('users/${user.uid}/role');
-        final roleSnapshot = await userRoleRef.get();
+        final userSnapshot = await _dbRef.child('users/${user.uid}').get();
 
-        if (roleSnapshot.value == "admin") {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const AdminPage()),
-          );
+        if (userSnapshot.exists) {
+          final userData = userSnapshot.value as Map<dynamic, dynamic>;
+
+          // Check for suspension
+          if (userData['suspended'] == true) {
+            await _auth.signOut(); // Sign the user out
+            setState(() {
+              _errorMessage = 'Your account has been suspended. Please contact support.';
+            });
+          } else {
+            // Navigate based on role
+            final role = userData['role'];
+            if (role == "admin") {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const AdminPage()),
+              );
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const MaisonScreen()),
+              );
+            }
+          }
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const MaisonScreen()),
-          );
+          setState(() {
+            _errorMessage = 'User data not found in database.';
+          });
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -127,9 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         fillColor: Colors.white.withOpacity(0.8),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
                           ),
                           onPressed: () {
                             setState(() {
