@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'CommentScreen.dart';
+
+import 'CommentsScreen.dart';
 
 class ExploreScreen extends StatefulWidget {
   @override
@@ -13,6 +16,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final DatabaseReference _postRef = FirebaseDatabase.instance.ref().child('posts');
   final DatabaseReference _userRef = FirebaseDatabase.instance.ref().child('users');
   final DatabaseReference _followingRef = FirebaseDatabase.instance.ref().child('following');
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   List<Map<dynamic, dynamic>> _posts = [];
@@ -22,6 +26,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
+
     _currentUser = _auth.currentUser;
     if (_currentUser != null) {
       _fetchFollowingUsers(); // Fetch followed users first
@@ -78,12 +83,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         title: Text('Explore'),
         centerTitle: true,
       ),
+
       body: _posts.isNotEmpty
           ? ListView.builder(
         itemCount: _posts.length,
         itemBuilder: (context, index) {
           var post = _posts[index];
           return _buildPostCard(post);
+
         },
       )
           : Center(child: Text('No posts to show')),
@@ -140,16 +147,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _buildPostHeader(Map<dynamic, dynamic> userData, Map<dynamic, dynamic> post) {
     return ListTile(
       leading: CircleAvatar(
+
         backgroundImage: userData['profileImageUrl'] != null && userData['profileImageUrl'].isNotEmpty
             ? NetworkImage(userData['profileImageUrl'])
             : AssetImage('assets/profile_placeholder.png') as ImageProvider,
       ),
       title: Text(userData['username'] ?? 'Unknown User'),
       subtitle: Text(post['location'] ?? 'Unknown Location'),
+
     );
   }
 
   Widget _buildPostFooter(Map<dynamic, dynamic> post) {
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: Row(
@@ -207,6 +217,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         post['likesCount'] = (post['likesCount'] ?? 0) + 1;
       });
     }
+
   }
 
   void _notifyPostOwner(Map<dynamic, dynamic> post, String action) async {
@@ -227,6 +238,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
+
         builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId']),
       ),
     );
@@ -273,6 +285,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Post reported. Thank you for your feedback.')),
     );
+
   }
 }
 

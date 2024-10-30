@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'PostDetailScreen.dart';
 import 'Settings.dart';
+import 'dart:async';
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -30,6 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<Map<String, dynamic>> _posts = []; // Modify to store post details
   File? _image;
+  int _tapCount = 0;
+  Timer? _tapTimer;
 
   @override
   void initState() {
@@ -145,6 +148,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
 
+
+
   Future<void> _onPostTripleTap(String postId) async {
     showDialog(
       context: context,
@@ -178,6 +183,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Fluttertoast.showToast(msg: "Post deleted successfully", gravity: ToastGravity.BOTTOM);
     }
   }
+
+
 
 
 
@@ -250,6 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
 
+
   Future<void> _toggleLike(String postId, bool isCurrentlyLiked) async {
     if (_user != null) {
       DatabaseReference likesRef = _dbRef.child("posts").child(postId).child("likes").child(_user!.uid);
@@ -262,6 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
+
 
 
   Future<void> _uploadProfileImage(File image) async {
@@ -465,6 +474,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
+
                   );
                 },
               ),

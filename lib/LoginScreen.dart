@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import 'ForgotPasswordScreen.dart';
 import 'RegisterScreen.dart';
 import 'maison.dart';
+import 'AdminPage.dart'; // Admin page
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -17,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -34,10 +37,23 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MaisonScreen()),
-      );
+      User? user = _auth.currentUser;
+      if (user != null) {
+        final userRoleRef = _dbRef.child('users/${user.uid}/role');
+        final roleSnapshot = await userRoleRef.get();
+
+        if (roleSnapshot.value == "admin") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminPage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MaisonScreen()),
+          );
+        }
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMessage = e.message;
@@ -54,15 +70,12 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: <Widget>[
-          // Background Image
           SizedBox.expand(
             child: Image.asset(
-              'assets/login_image.jpg', // Path to your image in assets
+              'assets/login_image.jpg',
               fit: BoxFit.cover,
             ),
           ),
-
-          // Login Form
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Center(
@@ -90,8 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 30),
-
-                    // Email TextField
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -99,15 +110,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Email',
                         prefixIcon: const Icon(Icons.email),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.8), // Background for input
+                        fillColor: Colors.white.withOpacity(0.8),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10.0),
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Password TextField
                     TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -115,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.8), // Background for input
+                        fillColor: Colors.white.withOpacity(0.8),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -134,16 +143,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Error Message
                     if (_errorMessage != null)
                       Text(
                         _errorMessage!,
                         style: const TextStyle(color: Colors.red),
                       ),
                     const SizedBox(height: 10),
-
-                    // Sign In Button
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -169,11 +174,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Forgot Password Link
                     GestureDetector(
                       onTap: () {
-                        // Navigate to ForgotPasswordPage
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -190,10 +192,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 40),
-
-                    // Sign Up Link
                     Padding(
-                      padding: const EdgeInsets.only(top: 140.0), // Add padding
+                      padding: const EdgeInsets.only(top: 140.0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
@@ -204,7 +204,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 5),
                           GestureDetector(
                             onTap: () {
-                              // Navigate to SignupPage
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
