@@ -360,49 +360,6 @@ class _CreateScreenState extends State<CreateScreen> {
     }
   }
 
-  // Future<void> _getCurrentLocation() async {
-  //   bool serviceEnabled;
-  //   LocationPermission permission;
-  //
-  //   // Check if location services are enabled
-  //   serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  //   if (!serviceEnabled) {
-  //     Fluttertoast.showToast(msg: "Location services are disabled.");
-  //     return;
-  //   }
-  //
-  //   // Check for permissions
-  //   permission = await Geolocator.checkPermission();
-  //   if (permission == LocationPermission.deniedForever) {
-  //     Fluttertoast.showToast(
-  //         msg: "Location permissions are permanently denied.");
-  //     return;
-  //   }
-  //
-  //   if (permission == LocationPermission.denied) {
-  //     permission = await Geolocator.requestPermission();
-  //     if (permission != LocationPermission.whileInUse &&
-  //         permission != LocationPermission.always) {
-  //       Fluttertoast.showToast(msg: "Location permissions are denied.");
-  //       return;
-  //     }
-  //   }
-  //
-  //   // Get current location
-  //   try {
-  //     Position position = await Geolocator.getCurrentPosition(
-  //         desiredAccuracy: LocationAccuracy.high);
-  //
-  //     setState(() {
-  //       _selectedLatLng = LatLng(position.latitude, position.longitude);
-  //       _locationLink =
-  //       "https://www.google.com/maps/search/?api=1&query=${position.latitude},${position.longitude}";
-  //       _selectedLocation = 'Current Location';
-  //     });
-  //   } catch (e) {
-  //     Fluttertoast.showToast(msg: "Error getting location: $e");
-  //   }
-  // }
 
   Future<void> _selectLocation() async {
     LatLng? result = await Navigator.push(
