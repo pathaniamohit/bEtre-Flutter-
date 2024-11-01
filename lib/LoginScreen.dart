@@ -1,3 +1,4 @@
+import 'package:betreflutter/ModeratorDashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -5,7 +6,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'ForgotPasswordScreen.dart';
 import 'RegisterScreen.dart';
 import 'maison.dart';
-import 'AdminPage.dart'; // Admin page
+import 'AdminPage.dart';
+import 'ModeratorDashboard.dart'; // Moderator page
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -56,7 +58,12 @@ class _LoginScreenState extends State<LoginScreen> {
             if (role == "admin") {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const AdminPage()),
+                MaterialPageRoute(builder: (context) => const AdminPage()), // Kept const
+              );
+            } else if (role == "moderator") {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => ModeratorDashboard()),
               );
             } else {
               Navigator.pushReplacement(
