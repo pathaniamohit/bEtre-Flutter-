@@ -140,6 +140,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           posts.add(postData);
         }
+
+        // Reverse the list for Instagram-like ordering (newest to oldest)
+        posts = posts.reversed.toList();
+
         setState(() {
           _posts = posts;
         });
@@ -184,10 +188,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-
-
-
-
   Future<void> _onPostDoubleTap(String postId, String currentContent) async {
     TextEditingController _contentController = TextEditingController(text: currentContent);
     File? selectedImage;
@@ -211,7 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
                   if (image != null) {
                     selectedImage = File(image.path);
-                    Fluttertoast.showToast(msg: "Image selected", gravity: ToastGravity.BOTTOM);
+                    Fluttertoast.showToast(msg: "New image selected", gravity: ToastGravity.BOTTOM);
                   }
                 },
                 child: Text("Change Image"),
@@ -238,23 +238,104 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-
-
   Future<void> _updatePost(String postId, String newContent, File? newImage) async {
     if (_user != null) {
       Map<String, dynamic> updatedData = {"content": newContent};
 
-      if (newImage != null) {
-        String path = 'posts/${_user!.uid}/${postId}.jpg';
-        TaskSnapshot uploadTask = await _storage.ref(path).putFile(newImage);
-        String downloadUrl = await uploadTask.ref.getDownloadURL();
-        updatedData['imageUrl'] = downloadUrl;
-      }
+      try {
+        // Update the image if a new image was selected
+        if (newImage != null) {
+          String path = 'post_images/${postId}.jpg';
+          SettableMetadata metadata = SettableMetadata(customMetadata: {
+            'userId': _user!.uid,
+          });
 
-      await _dbRef.child("posts").child(postId).update(updatedData);
-      Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
+          TaskSnapshot uploadTask = await _storage.ref(path).putFile(newImage, metadata);
+          String downloadUrl = await uploadTask.ref.getDownloadURL();
+          updatedData['imageUrl'] = downloadUrl;
+        }
+
+        await _dbRef.child("posts").child(postId).update(updatedData);
+        Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
+
+        // Reload the posts to reflect the changes
+        _loadUserPosts();
+      } catch (e) {
+        Fluttertoast.showToast(msg: "Failed to update post: $e", gravity: ToastGravity.BOTTOM);
+      }
     }
   }
+
+
+
+
+  // Future<void> _onPostDoubleTap(String postId, String currentContent) async {
+  //   TextEditingController _contentController = TextEditingController(text: currentContent);
+  //   File? selectedImage;
+  //
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) {
+  //       return AlertDialog(
+  //         title: Text('Edit Post'),
+  //         content: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             TextField(
+  //               controller: _contentController,
+  //               decoration: InputDecoration(labelText: 'Edit Content'),
+  //             ),
+  //             SizedBox(height: 10),
+  //             ElevatedButton(
+  //               onPressed: () async {
+  //                 final ImagePicker _picker = ImagePicker();
+  //                 final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+  //                 if (image != null) {
+  //                   selectedImage = File(image.path);
+  //                   Fluttertoast.showToast(msg: "Image selected", gravity: ToastGravity.BOTTOM);
+  //                 }
+  //               },
+  //               child: Text("Change Image"),
+  //             ),
+  //           ],
+  //         ),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () {
+  //               Navigator.pop(context);
+  //             },
+  //             child: Text('Cancel'),
+  //           ),
+  //           TextButton(
+  //             onPressed: () {
+  //               _updatePost(postId, _contentController.text.trim(), selectedImage);
+  //               Navigator.pop(context);
+  //             },
+  //             child: Text('Update'),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
+  //
+  //
+  //
+  // Future<void> _updatePost(String postId, String newContent, File? newImage) async {
+  //   if (_user != null) {
+  //     Map<String, dynamic> updatedData = {"content": newContent};
+  //
+  //     if (newImage != null) {
+  //       String path = 'posts/${_user!.uid}/${postId}.jpg';
+  //       TaskSnapshot uploadTask = await _storage.ref(path).putFile(newImage);
+  //       String downloadUrl = await uploadTask.ref.getDownloadURL();
+  //       updatedData['imageUrl'] = downloadUrl;
+  //     }
+  //
+  //     await _dbRef.child("posts").child(postId).update(updatedData);
+  //     Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
+  //   }
+  // }
 
 
 

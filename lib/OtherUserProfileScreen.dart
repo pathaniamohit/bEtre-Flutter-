@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 import 'PostDetailScreen.dart';
 
@@ -154,11 +155,35 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
     );
   }
 
+  void _reportProfile() async {
+    String reportedUserId = widget.userId;
+    String reporterId = _currentUser!.uid;
+
+    DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reports').push();
+    await reportRef.set({
+      'type': 'profile',
+      'reportedItemId': reportedUserId,
+      'reportedUserId': reportedUserId,
+      'reporterId': reporterId,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'reason': 'Inappropriate profile',
+    });
+
+    Fluttertoast.showToast(msg: 'Profile reported.');
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(_username),
+          actions: [
+      IconButton(
+      icon: Icon(Icons.flag),
+      onPressed: _reportProfile,
+      ),
+          ],
       ),
       body: SingleChildScrollView(
         child: Column(
