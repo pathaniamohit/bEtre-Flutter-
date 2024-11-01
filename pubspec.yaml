@@ -41,11 +41,12 @@ dependencies:
   image_picker: ^0.8.7+3  # Updated Image Picker
   fluttertoast: ^8.2.1    # Updated FlutterToast
   flutter_google_places: ^0.3.0  # Updated Google Places
-  google_maps_flutter: ^2.2.2    # Updated Google Maps
+  google_maps_flutter: ^2.2.7   # Updated Google Maps
   google_maps_webservice: ^0.0.20-nullsafety.2  # Latest Google Maps Web Service
   geocoding: ^2.1.0  # Latest Geocoding
   google_place: ^0.4.7
   geolocator: ^9.0.2
+  permission_handler: ^10.2.0
 
 
 
