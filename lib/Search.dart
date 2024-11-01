@@ -310,23 +310,88 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     });
   }
 
-  void _reportPost(Map<dynamic, dynamic> post) async {
-    final postId = post['postId'];
-    final userId = _currentUser!.uid;
-    final reportsRef = _postRef.child(postId).child('reports');
-    final userReportRef = reportsRef.child(userId);
+  // void _reportPost(Map<dynamic, dynamic> post) async {
+  //   final postId = post['postId'];
+  //   final userId = _currentUser!.uid;
+  //   final reportsRef = _postRef.child(postId).child('reports');
+  //   final userReportRef = reportsRef.child(userId);
+  //
+  //   final DataSnapshot snapshot = await userReportRef.get();
+  //   bool isReported = snapshot.exists;
+  //
+  //   if (isReported) {
+  //     Fluttertoast.showToast(msg: 'You have already reported this post.');
+  //   } else {
+  //     await userReportRef.set(true);
+  //     Fluttertoast.showToast(msg: 'Post reported.');
+  //     // Optionally, notify admins or take further actions
+  //   }
+  // }
 
-    final DataSnapshot snapshot = await userReportRef.get();
-    bool isReported = snapshot.exists;
+  void _reportPost(Map<dynamic, dynamic> post) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        TextEditingController _reasonController = TextEditingController();
 
-    if (isReported) {
-      Fluttertoast.showToast(msg: 'You have already reported this post.');
-    } else {
-      await userReportRef.set(true);
-      Fluttertoast.showToast(msg: 'Post reported.');
-      // Optionally, notify admins or take further actions
-    }
+        return AlertDialog(
+          title: Text('Report Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Please specify the reason for reporting this post:'),
+              TextField(
+                controller: _reasonController,
+                decoration: InputDecoration(
+                  hintText: 'Enter reason',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                String reason = _reasonController.text.trim();
+                if (reason.isEmpty) {
+                  Fluttertoast.showToast(msg: 'Please enter a reason.');
+                  return;
+                }
+
+                // Proceed to report the post
+                String postId = post['postId'];
+                String postOwnerId = post['userId'];
+                String reporterId = _currentUser!.uid;
+                String reporterName = _currentUser!.displayName ?? 'Unknown';
+
+                DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reports').push();
+                await reportRef.set({
+                  'type': 'post',
+                  'reportedItemId': postId,
+                  'reportedUserId': postOwnerId,
+                  'reporterId': reporterId,
+                  'reporterName': reporterName,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                  'reason': reason,
+                  'content': post['content'] ?? '',
+                });
+
+                Navigator.pop(context); // Close the dialog
+                Fluttertoast.showToast(msg: 'Post reported.');
+              },
+              child: Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
   }
+
 
   void _navigateToComments(Map<dynamic, dynamic> post) {
     Navigator.push(

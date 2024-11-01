@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 import 'CommentScreen.dart';
 
@@ -244,33 +245,116 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  // void _reportPost(Map<dynamic, dynamic> post) {
+  //   // Implement your report functionality here
+  //   // For now, we'll just show a dialog
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: Text('Report Post'),
+  //       content: Text('Are you sure you want to report this post for inappropriate content?'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () {
+  //             Navigator.pop(context);
+  //           },
+  //           child: Text('Cancel'),
+  //         ),
+  //         TextButton(
+  //           onPressed: () {
+  //             // Report the post
+  //             _sendReport(post);
+  //             Navigator.pop(context);
+  //           },
+  //           child: Text('Report', style: TextStyle(color: Colors.red)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  // void _reportPost(Map<dynamic, dynamic> post) async {
+  //   String postId = post['postId'];
+  //   String postOwnerId = post['userId'];
+  //   String reporterId = _currentUser!.uid;
+  //
+  //   DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reports').push();
+  //   await reportRef.set({
+  //     'type': 'post',
+  //     'reportedItemId': postId,
+  //     'reportedUserId': postOwnerId,
+  //     'reporterId': reporterId,
+  //     'timestamp': DateTime.now().millisecondsSinceEpoch,
+  //     'reason': 'Inappropriate content', // You could let users choose reasons
+  //   });
+  //
+  //   Fluttertoast.showToast(msg: 'Post reported.');
+  // }
+
   void _reportPost(Map<dynamic, dynamic> post) {
-    // Implement your report functionality here
-    // For now, we'll just show a dialog
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Report Post'),
-        content: Text('Are you sure you want to report this post for inappropriate content?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text('Cancel'),
+      builder: (context) {
+        TextEditingController _reasonController = TextEditingController();
+
+        return AlertDialog(
+          title: Text('Report Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Please specify the reason for reporting this post:'),
+              TextField(
+                controller: _reasonController,
+                decoration: InputDecoration(
+                  hintText: 'Enter reason',
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              // Report the post
-              _sendReport(post);
-              Navigator.pop(context);
-            },
-            child: Text('Report', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                String reason = _reasonController.text.trim();
+                if (reason.isEmpty) {
+                  Fluttertoast.showToast(msg: 'Please enter a reason.');
+                  return;
+                }
+
+                // Proceed to report the post
+                String postId = post['postId'];
+                String postOwnerId = post['userId'];
+                String reporterId = _currentUser!.uid;
+                String reporterName = _currentUser!.displayName ?? 'Unknown';
+
+                DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reports').push();
+                await reportRef.set({
+                  'type': 'post',
+                  'reportedItemId': postId,
+                  'reportedUserId': postOwnerId,
+                  'reporterId': reporterId,
+                  'reporterName': reporterName,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                  'reason': reason,
+                  'content': post['content'] ?? '',
+                });
+
+                Navigator.pop(context); // Close the dialog
+                Fluttertoast.showToast(msg: 'Post reported.');
+              },
+              child: Text('Submit'),
+            ),
+          ],
+        );
+      },
     );
   }
+
 
   void _sendReport(Map<dynamic, dynamic> post) async {
     // Send the report to your database or backend

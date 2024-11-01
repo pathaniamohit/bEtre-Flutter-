@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class CommentScreen extends StatefulWidget {
   final String postId;
@@ -101,6 +102,115 @@ class _CommentScreenState extends State<CommentScreen> {
     }
   }
 
+  // void _reportComment(Map<dynamic, dynamic> comment) async {
+  //   String commentId = comment['commentId'];
+  //   String commentOwnerId = comment['userId'];
+  //   String reporterId = _currentUser!.uid;
+  //
+  //   DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reports').push();
+  //   await reportRef.set({
+  //     'type': 'comment',
+  //     'reportedItemId': commentId,
+  //     'reportedUserId': commentOwnerId,
+  //     'reporterId': reporterId,
+  //     'timestamp': DateTime.now().millisecondsSinceEpoch,
+  //     'reason': 'Inappropriate comment',
+  //   });
+  //
+  //   Fluttertoast.showToast(msg: 'Comment reported.');
+  // }
+
+  void _reportComment(Map<dynamic, dynamic> comment) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        TextEditingController _reasonController = TextEditingController();
+
+        return AlertDialog(
+          title: Text('Report Comment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Please specify the reason for reporting this comment:'),
+              TextField(
+                controller: _reasonController,
+                decoration: InputDecoration(
+                  hintText: 'Enter reason',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                String reason = _reasonController.text.trim();
+                if (reason.isEmpty) {
+                  Fluttertoast.showToast(msg: 'Please enter a reason.');
+                  return;
+                }
+
+                // Proceed to report the comment
+                String commentId = comment['commentId'];
+                String commentOwnerId = comment['userId'];
+                String reporterId = _currentUser!.uid;
+                String reporterName = _currentUser!.displayName ?? 'Unknown';
+
+                DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reports').push();
+                await reportRef.set({
+                  'type': 'comment',
+                  'reportedItemId': commentId,
+                  'reportedUserId': commentOwnerId,
+                  'reporterId': reporterId,
+                  'reporterName': reporterName,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                  'reason': reason,
+                  'content': comment['content'] ?? '',
+                });
+
+                Navigator.pop(context); // Close the dialog
+                Fluttertoast.showToast(msg: 'Comment reported.');
+              },
+              child: Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  Widget _buildCommentListTile(Map<dynamic, dynamic> comment) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: comment['userProfileImageUrl'] != null && comment['userProfileImageUrl'] != ''
+            ? NetworkImage(comment['userProfileImageUrl'])
+            : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+      ),
+      title: Text(comment['username'] ?? 'Unknown User'),
+      subtitle: Text(comment['content']),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.flag),
+            onPressed: () => _reportComment(comment),
+          ),
+          if (comment['userId'] == _currentUser!.uid || widget.postOwnerId == _currentUser!.uid)
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () => _deleteComment(comment),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,21 +225,22 @@ class _CommentScreenState extends State<CommentScreen> {
               itemCount: _comments.length,
               itemBuilder: (context, index) {
                 var comment = _comments[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: comment['userProfileImageUrl'] != null && comment['userProfileImageUrl'] != ''
-                        ? NetworkImage(comment['userProfileImageUrl'])
-                        : AssetImage('assets/profile_placeholder.png') as ImageProvider,
-                  ),
-                  title: Text(comment['username'] ?? 'Unknown User'),
-                  subtitle: Text(comment['content']),
-                  trailing: (comment['userId'] == _currentUser!.uid || widget.postOwnerId == _currentUser!.uid)
-                      ? IconButton(
-                    icon: Icon(Icons.delete),
-                    onPressed: () => _deleteComment(comment),
-                  )
-                      : null,
-                );
+                return _buildCommentListTile(comment);
+                // return ListTile(
+                //   leading: CircleAvatar(
+                //     backgroundImage: comment['userProfileImageUrl'] != null && comment['userProfileImageUrl'] != ''
+                //         ? NetworkImage(comment['userProfileImageUrl'])
+                //         : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+                //   ),
+                //   title: Text(comment['username'] ?? 'Unknown User'),
+                //   subtitle: Text(comment['content']),
+                //   trailing: (comment['userId'] == _currentUser!.uid || widget.postOwnerId == _currentUser!.uid)
+                //       ? IconButton(
+                //     icon: Icon(Icons.delete),
+                //     onPressed: () => _deleteComment(comment),
+                //   )
+                //       : null,
+                // );
               },
             )
                 : Center(child: Text('No comments')),
