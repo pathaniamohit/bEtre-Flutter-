@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:io';
 
 class PostsSection extends StatefulWidget {
   final DatabaseReference dbRef;
-  PostsSection({required this.dbRef});
+  final bool isModerator;
+
+  PostsSection({required this.dbRef, this.isModerator = false});
 
   @override
   _PostsSectionState createState() => _PostsSectionState();
@@ -70,72 +74,19 @@ class _PostsSectionState extends State<PostsSection> {
     await widget.dbRef.child('posts').child(postId).remove();
   }
 
-  Future<void> editPost(String postId, String content, File? imageFile) async {
-    final updates = {'content': content};
-    if (imageFile != null) {
-      // Handle image upload here if using Firebase Storage
+  Future<void> updatePost(String postId, String newContent, String? newImageUrl) async {
+    Map<String, dynamic> updatedData = {'content': newContent};
+    if (newImageUrl != null) {
+      updatedData['imageUrl'] = newImageUrl;
     }
-    await widget.dbRef.child('posts').child(postId).update(updates);
+    await widget.dbRef.child('posts').child(postId).update(updatedData);
   }
 
-  void showEditDialog(Map<String, dynamic> post) async {
-    final contentController = TextEditingController(text: post['content']);
-    File? selectedImage;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text("Edit Post"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: contentController,
-                  decoration: InputDecoration(labelText: 'Content'),
-                ),
-                SizedBox(height: 10),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-                    if (pickedFile != null) {
-                      setState(() {
-                        selectedImage = File(pickedFile.path);
-                      });
-                    }
-                  },
-                  icon: Icon(Icons.image),
-                  label: Text("Select Image"),
-                ),
-                if (selectedImage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Image.file(
-                      selectedImage!,
-                      height: 150,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () async {
-                await editPost(post['postId'], contentController.text, selectedImage);
-                Navigator.of(context).pop();
-              },
-              child: Text("Save"),
-            ),
-          ],
-        );
-      },
-    );
+  Future<String?> uploadImage(File image) async {
+    final storageRef = FirebaseStorage.instance.ref().child('post_images/${DateTime.now().toIso8601String()}');
+    final uploadTask = storageRef.putFile(image);
+    final snapshot = await uploadTask.whenComplete(() {});
+    return await snapshot.ref.getDownloadURL();
   }
 
   @override
@@ -201,15 +152,16 @@ class _PostsSectionState extends State<PostsSection> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.edit,
-                          color: Colors.blue,
+                      if (!widget.isModerator)
+                        IconButton(
+                          icon: Icon(
+                            Icons.edit,
+                            color: Colors.blue,
+                          ),
+                          onPressed: () {
+                            showEditDialog(post);
+                          },
                         ),
-                        onPressed: () {
-                          showEditDialog(post);
-                        },
-                      ),
                       IconButton(
                         icon: Icon(
                           Icons.delete,
@@ -249,6 +201,64 @@ class _PostsSectionState extends State<PostsSection> {
           );
         },
       ),
+    );
+  }
+
+  void showEditDialog(Map<String, dynamic> post) {
+    TextEditingController contentController = TextEditingController(text: post['content']);
+    File? newImageFile;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Edit Post"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: contentController,
+                decoration: InputDecoration(labelText: 'Content'),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () async {
+                  final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+                  if (pickedFile != null) {
+                    setState(() {
+                      newImageFile = File(pickedFile.path);
+                    });
+                  }
+                },
+                child: Text("Change Image"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () async {
+                String? newImageUrl;
+                if (newImageFile != null) {
+                  newImageUrl = await uploadImage(newImageFile!);
+                }
+                await updatePost(post['postId'], contentController.text, newImageUrl);
+                Fluttertoast.showToast(
+                  msg: "Post updated successfully!",
+                  toastLength: Toast.LENGTH_SHORT,
+                  gravity: ToastGravity.BOTTOM,
+                  timeInSecForIosWeb: 1,
+                );
+                Navigator.of(context).pop();
+              },
+              child: Text("Save"),
+            ),
+          ],
+        );
+      },
     );
   }
 }

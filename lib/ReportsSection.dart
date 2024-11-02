@@ -7,7 +7,6 @@ class ReportsSection extends StatelessWidget {
 
   ReportsSection({required this.dbRef});
 
-  // Issue a warning to a user
   Future<void> issueWarning(String userId) async {
     await dbRef.child('users').child(userId).child('warnings').push().set({
       'timestamp': DateTime.now().toIso8601String(),
@@ -21,7 +20,6 @@ class ReportsSection extends StatelessWidget {
     );
   }
 
-  // Delete the reported content (post or comment)
   Future<void> deleteReportedContent(String itemId, String type) async {
     if (type == 'post') {
       await dbRef.child('posts').child(itemId).remove();
@@ -36,7 +34,6 @@ class ReportsSection extends StatelessWidget {
     );
   }
 
-  // Discard report and approve content
   Future<void> discardReport(String reportId) async {
     await dbRef.child('reports').child(reportId).remove();
     Fluttertoast.showToast(
@@ -45,6 +42,14 @@ class ReportsSection extends StatelessWidget {
       gravity: ToastGravity.BOTTOM,
       timeInSecForIosWeb: 1,
     );
+  }
+
+  Future<Map<String, dynamic>> getReporterDetails(String userId) async {
+    final snapshot = await dbRef.child('users').child(userId).get();
+    if (snapshot.exists) {
+      return Map<String, dynamic>.from(snapshot.value as Map);
+    }
+    return {};
   }
 
   @override
@@ -63,49 +68,124 @@ class ReportsSection extends StatelessWidget {
 
         final reports = Map<String, dynamic>.from(data);
 
-        return ListView(
-          children: reports.entries.map((entry) {
-            final reportId = entry.key;
-            final reportData = Map<String, dynamic>.from(entry.value);
-            final reportedItemId = reportData['reportedItemId'] ?? 'Unknown';
-            final reportedUserId = reportData['reportedUserId'] ?? 'Unknown';
-            final reporterId = reportData['reporterId'] ?? 'Unknown';
-            final reason = reportData['reason'] ?? 'No reason provided';
-            final type = reportData['type'] ?? 'Unknown';
-            final content = reportData['content'] ?? '';
+        // Separate reports by type, and gather comments from both the main reports and the 'comments' sub-node
+        final postReports = reports.entries.where((entry) => entry.value['type'] == 'post').toList();
+        final userReports = reports.entries.where((entry) => entry.value['type'] == 'profile').toList();
 
-            return ListTile(
-              title: Text('Reported $type: $content'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        // Gather comments from both `type == 'comment'` entries and from the dedicated 'comments' sub-node
+        final commentReports = reports.entries
+            .where((entry) => entry.value['type'] == 'comment')
+            .toList();
+
+        if (reports.containsKey('comments') && reports['comments'] is Map) {
+          final commentsSubNode = Map<String, dynamic>.from(reports['comments']);
+          commentReports.addAll(commentsSubNode.entries);
+        }
+
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
                 children: [
-                  Text('Reason: $reason'),
-                  Text('Reported by User ID: $reporterId'),
-                  Text('Reported User ID: $reportedUserId'),
+                  _buildReportSection("Post Reports", postReports, 'post'),
+                  _buildReportSection("Comment Reports", commentReports, 'comment'),
+                  _buildReportSection("User Reports", userReports, 'profile'),
                 ],
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.check, color: Colors.green),
-                    onPressed: () => discardReport(reportId), // Approve content
-                    tooltip: 'Approve Content',
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => deleteReportedContent(reportedItemId, type), // Delete content
-                    tooltip: 'Delete Content',
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.warning, color: Colors.orange),
-                    onPressed: () => issueWarning(reportedUserId), // Issue warning
-                    tooltip: 'Issue Warning',
-                  ),
-                ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildReportSection(String title, List<MapEntry<String, dynamic>> reports, String type) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        ...reports.map((entry) => _buildReportTile(entry, type)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildReportTile(MapEntry<String, dynamic> entry, String type) {
+    final reportId = entry.key;
+    final reportData = Map<String, dynamic>.from(entry.value);
+    final reportedItemId = reportData['reportedItemId'] ?? 'Unknown';
+    final reportedUserId = reportData['reportedUserId'] ?? 'Unknown';
+    final reporterId = reportData['reporterId'] ?? 'Unknown';
+    final reason = reportData['reason'] ?? 'No reason provided';
+
+    return FutureBuilder(
+      future: dbRef.child(type == 'post' ? 'posts' : 'comments').child(reportedItemId).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CircularProgressIndicator();
+        }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return ListTile(title: Text("No $type found for Report ID: $reportId"));
+        }
+
+        final itemData = Map<String, dynamic>.from(snapshot.data!.value as Map);
+        final itemImageUrl = type == 'post' ? itemData['imageUrl'] : null;
+        final itemContent = itemData['content'] ?? '';
+
+        return ListTile(
+          leading: itemImageUrl != null
+              ? Image.network(
+            itemImageUrl,
+            width: 50,
+            height: 50,
+            fit: BoxFit.cover,
+          )
+              : Icon(type == 'post' ? Icons.post_add : Icons.comment),
+          title: Text('Reported $type: $itemContent'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Reason: $reason'),
+              FutureBuilder(
+                future: getReporterDetails(reporterId),
+                builder: (context, reporterSnapshot) {
+                  if (reporterSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Text("Loading reporter info...");
+                  }
+                  if (!reporterSnapshot.hasData || reporterSnapshot.data!.isEmpty) {
+                    return const Text("Reporter: Unknown");
+                  }
+
+                  final reporterDetails = reporterSnapshot.data!;
+                  final reporterUsername = reporterDetails['username'] ?? 'Unknown';
+                  return Text('Reported by: $reporterUsername');
+                },
               ),
-            );
-          }).toList(),
+              Text('Reported User ID: $reportedUserId'),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.check, color: Colors.green),
+                onPressed: () => discardReport(reportId),
+                tooltip: 'Approve Content',
+              ),
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: () => deleteReportedContent(reportedItemId, type),
+                tooltip: 'Delete Content',
+              ),
+              IconButton(
+                icon: Icon(Icons.warning, color: Colors.orange),
+                onPressed: () => issueWarning(reportedUserId),
+                tooltip: 'Issue Warning',
+              ),
+            ],
+          ),
         );
       },
     );
