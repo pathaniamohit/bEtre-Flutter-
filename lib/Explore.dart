@@ -240,7 +240,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       context,
       MaterialPageRoute(
 
-        builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId']),
+        builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId'], canReport: false,),
       ),
     );
   }
