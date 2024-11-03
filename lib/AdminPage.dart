@@ -1,7 +1,6 @@
-import 'package:betreflutter/Profile.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'ProifleAdmin.dart';
+import 'ProfileAdmin.dart';
 import 'FlaggedContentSection.dart';
 import 'PostsSection.dart';
 import 'ReportsSection.dart';
@@ -61,7 +60,7 @@ class _AdminPageState extends State<AdminPage> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.people),
-            label: 'Analytics',
+            label: 'Users',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.post_add),

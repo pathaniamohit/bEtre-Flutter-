@@ -397,7 +397,7 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId']),
+        builder: (context) => CommentScreen(postId: post['postId'], postOwnerId: post['userId'],canReport: false,),
       ),
     );
   }

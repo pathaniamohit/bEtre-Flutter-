@@ -986,6 +986,59 @@ class _CreateScreenState extends State<CreateScreen> {
     }
   }
 
+  // Future<void> _createPost() async {
+  //   if (_user == null) {
+  //     Fluttertoast.showToast(msg: "User not authenticated");
+  //     return;
+  //   }
+  //
+  //   String content = _postContentController.text.trim();
+  //
+  //   if (_selectedImage == null) {
+  //     Fluttertoast.showToast(msg: "Please select an image");
+  //     return;
+  //   }
+  //
+  //   try {
+  //     String userId = _user!.uid;
+  //     String imageId = '${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  //     String filePath = 'post_images/$imageId';
+  //
+  //     SettableMetadata metadata = SettableMetadata(customMetadata: {
+  //       'userId': userId,
+  //     });
+  //
+  //     UploadTask uploadTask = _storage.ref(filePath).putFile(_selectedImage!, metadata);
+  //     TaskSnapshot taskSnapshot = await uploadTask.whenComplete(() => null);
+  //     String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+  //
+  //     Map<String, dynamic> postData = {
+  //       'userId': userId,
+  //       'username': _username,
+  //       'imageUrl': downloadUrl,
+  //       'timestamp': DateTime.now().millisecondsSinceEpoch,
+  //     };
+  //
+  //     if (content.isNotEmpty) {
+  //       postData['content'] = content;
+  //     }
+  //
+  //     if (_selectedLatLng != null) {
+  //       postData['location'] = _locationLink;
+  //       postData['latitude'] = _selectedLatLng!.latitude;
+  //       postData['longitude'] = _selectedLatLng!.longitude;
+  //       postData['address'] = _selectedLocation;
+  //     }
+  //
+  //     await _dbRef.push().set(postData);
+  //     Fluttertoast.showToast(msg: "Post created successfully");
+  //     _resetFields();
+  //   } catch (error) {
+  //     print("Error creating post: $error");
+  //     Fluttertoast.showToast(msg: "Failed to create post: $error");
+  //   }
+  // }
+
   Future<void> _createPost() async {
     if (_user == null) {
       Fluttertoast.showToast(msg: "User not authenticated");
@@ -1030,14 +1083,20 @@ class _CreateScreenState extends State<CreateScreen> {
         postData['address'] = _selectedLocation;
       }
 
-      await _dbRef.push().set(postData);
-      Fluttertoast.showToast(msg: "Post created successfully");
-      _resetFields();
+      await _dbRef.push().set(postData).then((_) {
+        print('Post created successfully under posts node');
+        Fluttertoast.showToast(msg: "Post created successfully");
+        _resetFields();
+      }).catchError((error) {
+        print('Error creating post: $error');
+        Fluttertoast.showToast(msg: "Failed to create post: $error");
+      });
     } catch (error) {
       print("Error creating post: $error");
       Fluttertoast.showToast(msg: "Failed to create post: $error");
     }
   }
+
 
   void _resetFields() {
     setState(() {
