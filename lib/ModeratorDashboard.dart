@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
-import 'PostsSection.dart';
+import 'PostsModSection.dart';
 import 'ReportsSection.dart';
 import 'ProfileModSection.dart';
 import 'AnalyticsModSection.dart';
@@ -25,8 +25,8 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
   void initState() {
     super.initState();
     _sections.addAll([
-      PostsSection(dbRef: widget.dbRef),
-      AnalyticsModSection(dbRef: widget.dbRef), // Add Analytics section here
+      PostsModSection(dbRef: widget.dbRef),
+      AnalyticsModSection(dbRef: widget.dbRef),
       ReportsSection(dbRef: widget.dbRef),
       ProfileModSection(dbRef: widget.dbRef),
     ]);
@@ -60,7 +60,7 @@ class _ModeratorDashboardState extends State<ModeratorDashboard> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
-            label: "Analytics", // New Analytics tab
+            label: "Analytics",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.report),

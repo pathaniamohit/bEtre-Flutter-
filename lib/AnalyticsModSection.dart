@@ -12,6 +12,8 @@ class AnalyticsModSection extends StatefulWidget {
 
 class _AnalyticsModSectionState extends State<AnalyticsModSection> {
   List<Map<String, dynamic>> allUsers = [];
+  List<Map<String, dynamic>> filteredUsers = [];
+  String _searchQuery = "";
 
   @override
   void initState() {
@@ -34,8 +36,20 @@ class _AnalyticsModSectionState extends State<AnalyticsModSection> {
 
         setState(() {
           allUsers = users;
+          _filterUsers(); // Filter users based on initial (empty) search query
         });
       }
+    });
+  }
+
+  // Filter users based on search query
+  void _filterUsers() {
+    setState(() {
+      filteredUsers = allUsers.where((user) {
+        final userName = user['username']?.toLowerCase() ?? '';
+        final email = user['email']?.toLowerCase() ?? '';
+        return userName.contains(_searchQuery) || email.contains(_searchQuery);
+      }).toList();
     });
   }
 
@@ -43,7 +57,28 @@ class _AnalyticsModSectionState extends State<AnalyticsModSection> {
   void _toggleUserStatus(String userId, String currentStatus) {
     final userRef = widget.dbRef.child('users/$userId');
     String newStatus = currentStatus == 'active' ? 'suspended' : 'active';
-    userRef.update({'status': newStatus});
+
+    userRef.update({'status': newStatus}).then((_) {
+      // Show a SnackBar with a message after updating the status
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            newStatus == 'suspended'
+                ? 'User has been suspended.'
+                : 'User has been unsuspended.',
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }).catchError((error) {
+      // Show an error message if the update fails
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update user status: $error'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    });
   }
 
   @override
@@ -51,6 +86,24 @@ class _AnalyticsModSectionState extends State<AnalyticsModSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            decoration: InputDecoration(
+              labelText: "Search by username or email",
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value.toLowerCase();
+                _filterUsers(); // Filter users as search query changes
+              });
+            },
+          ),
+        ),
         const Padding(
           padding: EdgeInsets.all(8.0),
           child: Text(
@@ -60,10 +113,9 @@ class _AnalyticsModSectionState extends State<AnalyticsModSection> {
         ),
         Expanded(
           child: ListView.builder(
-            itemCount: allUsers.length,
+            itemCount: filteredUsers.length,
             itemBuilder: (context, index) {
-              final user = allUsers[index];
-              // Adjust this key to match the Firebase structure
+              final user = filteredUsers[index];
               final String userName = user['username'] ?? 'No Username';
               final String email = user['email'] ?? 'No Email';
               final String status = user['status'] ?? 'active';
