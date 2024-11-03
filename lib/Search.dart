@@ -156,6 +156,16 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     );
   }
 
+  /// Method to notify a user about follow/unfollow actions
+  Future<void> _notifyUser(String userId, String action) async {
+    final notificationsRef = FirebaseDatabase.instance.ref().child('notifications').child(userId);
+    await notificationsRef.push().set({
+      'fromUserId': _currentUser!.uid,
+      'action': action, // e.g., 'started following you' or 'unfollowed you'
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
   Future<void> _followUser(String userId) async {
     if (_currentUser == null) return;
 
@@ -170,6 +180,9 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
       // Remove the user's posts from the _posts list
       _posts.removeWhere((post) => post['userId'] == userId);
     });
+
+    // Notify the user about the follow
+    _notifyUser(userId, 'started following you');
   }
 
   Future<void> _unfollowUser(String userId) async {
@@ -186,7 +199,12 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
       // Re-fetch the posts to include the unfollowed user's posts
       _fetchAllPosts();
     });
+
+    // Notify the user about the unfollow
+    _notifyUser(userId, 'unfollowed you');
   }
+
+
 
   Widget _buildPostCard(Map<dynamic, dynamic> post) {
     return FutureBuilder(
@@ -301,7 +319,7 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
     final currentUserId = _currentUser!.uid;
     if (postOwnerId == currentUserId) return; // Don't notify if the user is liking their own post
 
-    final inboxRef = FirebaseDatabase.instance.ref().child('inbox').child(postOwnerId);
+    final inboxRef = FirebaseDatabase.instance.ref().child('notifications').child(postOwnerId);
     await inboxRef.push().set({
       'fromUserId': currentUserId,
       'action': action,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'Explore.dart';
 import 'Search.dart';
 import 'Create.dart';
-import 'Inbox.dart';
+import 'NotificationsScreen.dart';
 import 'Profile.dart';
 
 class MaisonScreen extends StatefulWidget {
@@ -19,7 +19,7 @@ class _MaisonScreenState extends State<MaisonScreen> {
     ExploreScreen(),
     SearchUserScreen(),
     CreateScreen(),
-    InboxScreen(),
+    NotificationsScreen(),
     ProfileScreen(),
   ];
 

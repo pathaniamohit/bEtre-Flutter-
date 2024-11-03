@@ -304,6 +304,8 @@
 //   }
 // }
 
+//OtherUserProfileScreen.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -430,6 +432,16 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
     }
   }
 
+  /// Method to notify a user about follow/unfollow actions
+  Future<void> _notifyUser(String userId, String action) async {
+    final notificationsRef = FirebaseDatabase.instance.ref().child('notifications').child(userId);
+    await notificationsRef.push().set({
+      'fromUserId': _currentUser!.uid,
+      'action': action, // e.g., 'started following you' or 'unfollowed you'
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
   Future<void> _toggleFollow() async {
     if (_currentUser != null) {
       DatabaseReference followingRef = _dbRef.child("following").child(_currentUser!.uid).child(widget.userId);
@@ -440,10 +452,16 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
           await followingRef.remove();
           await followersRef.remove();
           Fluttertoast.showToast(msg: 'Unfollowed successfully.', gravity: ToastGravity.BOTTOM);
+
+          // Notify the user about the unfollow
+          _notifyUser(widget.userId, 'unfollowed you');
         } else {
           await followingRef.set(true);
           await followersRef.set(true);
           Fluttertoast.showToast(msg: 'Followed successfully.', gravity: ToastGravity.BOTTOM);
+
+          // Notify the user about the follow
+          _notifyUser(widget.userId, 'started following you');
         }
 
         setState(() {
@@ -456,6 +474,8 @@ class _OtherUserProfileScreenState extends State<OtherUserProfileScreen> {
       Fluttertoast.showToast(msg: 'You must be logged in to follow/unfollow.', gravity: ToastGravity.BOTTOM);
     }
   }
+
+
 
   Future<void> _toggleLike(String postId, bool isCurrentlyLiked) async {
     if (_currentUser != null) {
