@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class PostsSection extends StatefulWidget {
   final DatabaseReference dbRef;
@@ -13,6 +14,8 @@ class PostsSection extends StatefulWidget {
 class _PostsSectionState extends State<PostsSection> {
   List<Map<String, dynamic>> posts = [];
   Map<String, List<Map<String, dynamic>>> postComments = {};
+  Map<String, Map<String, dynamic>> userProfiles = {}; // Cache for user profiles
+  Map<String, String> profileImageUrls = {}; // Cache for profile image URLs
   List<Map<String, dynamic>> filteredPosts = []; // List to hold filtered posts
   String searchQuery = ""; // Search query string
 
@@ -22,10 +25,11 @@ class _PostsSectionState extends State<PostsSection> {
     loadPostsAndComments();
   }
 
-  /// Loads posts and their associated comments from the database
+  /// Loads posts, comments, and user profile data from the database
   void loadPostsAndComments() async {
     await loadPosts(); // Load all posts
     await loadComments(); // Load all comments and associate them with their posts
+    await loadUserProfiles(); // Load user profiles for each post owner
     setState(() {
       filteredPosts = posts; // Initialize filteredPosts with all posts
     });
@@ -61,6 +65,36 @@ class _PostsSectionState extends State<PostsSection> {
     }
   }
 
+  /// Loads user profile data for each post owner, including profile image URL
+  Future<void> loadUserProfiles() async {
+    for (var post in posts) {
+      final userId = post['userId'];
+      if (userId != null && !userProfiles.containsKey(userId)) {
+        final userSnapshot = await widget.dbRef.child('users').child(userId).get();
+        if (userSnapshot.exists) {
+          userProfiles[userId] = Map<String, dynamic>.from(userSnapshot.value as Map);
+          userProfiles[userId]?['profileImageUrl'] = await fetchProfileImageUrl(userId);
+        }
+      }
+    }
+  }
+
+  /// Fetches the profile image URL for a given userId from Firebase Storage
+  Future<String> fetchProfileImageUrl(String userId) async {
+    if (profileImageUrls.containsKey(userId)) {
+      return profileImageUrls[userId]!; // Return cached URL if available
+    }
+    try {
+      final ref = FirebaseStorage.instance.ref().child('users/$userId/profile.jpg');
+      String url = await ref.getDownloadURL();
+      profileImageUrls[userId] = url; // Cache the URL
+      return url;
+    } catch (e) {
+      print("Error fetching profile image for user $userId: $e");
+      return ''; // Return an empty string if the image is not found
+    }
+  }
+
   /// Deletes a specific post and all its associated comments
   Future<void> deletePost(String postId) async {
     await widget.dbRef.child('posts').child(postId).remove(); // Remove the post
@@ -77,6 +111,15 @@ class _PostsSectionState extends State<PostsSection> {
       posts.removeWhere((post) => post['postId'] == postId); // Update the post list in memory
       postComments.remove(postId); // Remove associated comments from memory
       applySearchFilter(); // Update filtered list after deletion
+    });
+  }
+
+  /// Deletes a specific comment
+  Future<void> deleteComment(String commentId, String postId) async {
+    await widget.dbRef.child('comments').child(commentId).remove();
+    setState(() {
+      // Update the local comments list after deletion
+      postComments[postId]?.removeWhere((comment) => comment['commentId'] == commentId);
     });
   }
 
@@ -107,6 +150,30 @@ class _PostsSectionState extends State<PostsSection> {
           TextButton(
             onPressed: () {
               deletePost(postId);
+              Navigator.pop(context);
+            },
+            child: Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Displays a confirmation dialog before deleting a comment
+  void confirmDeleteComment(String commentId, String postId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete Comment"),
+        content: Text("Are you sure you want to delete this comment?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              deleteComment(commentId, postId);
               Navigator.pop(context);
             },
             child: Text("Delete", style: TextStyle(color: Colors.red)),
@@ -149,7 +216,10 @@ class _PostsSectionState extends State<PostsSection> {
               itemBuilder: (context, index) {
                 final post = filteredPosts[index];
                 final postId = post['postId'];
-                final comments = postComments[postId] ?? []; // Get comments for this post
+                final userId = post['userId'] ?? '';
+                final comments = postComments[postId] ?? [];
+                final user = userProfiles[userId] ?? {};
+                final profileImageUrl = user['profileImageUrl'] ?? '';
 
                 return Card(
                   margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -158,6 +228,16 @@ class _PostsSectionState extends State<PostsSection> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Display post owner's profile information
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: profileImageUrl.isNotEmpty
+                                ? NetworkImage(profileImageUrl)
+                                : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+                          ),
+                          title: Text(user['username'] ?? 'Unknown User'),
+                          subtitle: Text(user['email'] ?? 'No email'),
+                        ),
                         // Display post image if available
                         if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)
                           Image.network(
@@ -165,18 +245,6 @@ class _PostsSectionState extends State<PostsSection> {
                             height: 200,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                      : null,
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) => Icon(Icons.error),
                           )
                         else
                           Container(
@@ -200,9 +268,9 @@ class _PostsSectionState extends State<PostsSection> {
                               leading: Icon(Icons.comment, color: Colors.grey),
                               title: Text(comment['username'] ?? 'Anonymous'),
                               subtitle: Text(comment['content'] ?? 'No content'),
-                              trailing: Text(
-                                DateTime.fromMillisecondsSinceEpoch(comment['timestamp'].toInt()).toString(),
-                                style: TextStyle(fontSize: 10, color: Colors.grey),
+                              trailing: IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => confirmDeleteComment(comment['commentId'], postId),
                               ),
                             ),
                         ] else
