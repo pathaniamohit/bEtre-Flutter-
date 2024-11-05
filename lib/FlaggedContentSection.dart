@@ -63,9 +63,14 @@ class _FlaggedContentSectionState extends State<FlaggedContentSection> {
     return {'username': 'Unknown User', 'email': 'No Email'};
   }
 
-  Future<void> suspendUser(String userId) async {
-    await widget.dbRef.child('users').child(userId).update({'role': 'suspended'});
-    Fluttertoast.showToast(msg: 'User suspended successfully.', gravity: ToastGravity.BOTTOM);
+  Future<void> suspendUser(String userId, String commentId) async {
+    try {
+      await widget.dbRef.child('users').child(userId).update({'role': 'suspended'});
+      await widget.dbRef.child('report_comments').child(commentId).remove(); // Remove the reported comment
+      Fluttertoast.showToast(msg: 'User suspended and report removed successfully.', gravity: ToastGravity.BOTTOM);
+    } catch (e) {
+      Fluttertoast.showToast(msg: 'Error suspending user: $e', gravity: ToastGravity.BOTTOM);
+    }
   }
 
   Future<void> markReportAsReviewed(String commentId) async {
@@ -118,10 +123,14 @@ class _FlaggedContentSectionState extends State<FlaggedContentSection> {
   }
 
   Future<void> deleteComment(String postId, String commentId) async {
-    await widget.dbRef.child('comments').child(postId).child(commentId).remove();
-    await widget.dbRef.child('report_comments').child(commentId).remove();
-    Fluttertoast.showToast(msg: 'Comment deleted successfully.', gravity: ToastGravity.BOTTOM);
-    loadReportedComments();
+    try {
+      await widget.dbRef.child('comments').child(postId).child(commentId).remove(); // Remove from comments node
+      await widget.dbRef.child('report_comments').child(commentId).remove(); // Remove from report_comments node
+      Fluttertoast.showToast(msg: 'Comment deleted successfully.', gravity: ToastGravity.BOTTOM);
+      loadReportedComments();
+    } catch (e) {
+      Fluttertoast.showToast(msg: 'Error deleting comment: $e', gravity: ToastGravity.BOTTOM);
+    }
   }
 
   void _showConfirmationDialog(String title, String message, VoidCallback onConfirm) {
@@ -199,7 +208,7 @@ class _FlaggedContentSectionState extends State<FlaggedContentSection> {
                                   _showConfirmationDialog(
                                     'Suspend User',
                                     'Are you sure you want to suspend this user?',
-                                        () => suspendUser(report['reportedCommentUserId']),
+                                        () => suspendUser(report['reportedCommentUserId'], commentId),
                                   );
                                   break;
                                 case 'Reviewed':
