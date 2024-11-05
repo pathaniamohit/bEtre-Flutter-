@@ -28,7 +28,7 @@ class _AdminPageState extends State<AdminPage> {
       PostsSection(dbRef: dbRef),
       FlaggedContentSection(dbRef: dbRef),
       ReportsSection(dbRef: dbRef),
-      ProfileAdmin(dbRef: dbRef),
+      ProfileAdmin(),
     ];
   }
 
