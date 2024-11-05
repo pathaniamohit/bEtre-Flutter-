@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'LoginScreen.dart';
 import 'maison.dart';
+import 'AdminPage.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -23,15 +25,44 @@ class _SplashScreenState extends State<SplashScreen> {
     User? user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
+      // Navigate to Login if no user is signed in
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MaisonScreen()),
-      );
+      // User is signed in, fetch their role from the database
+      final DatabaseReference userRef = FirebaseDatabase.instance.ref().child('users').child(user.uid);
+
+      userRef.child('role').once().then((DatabaseEvent event) {
+        if (event.snapshot.exists) {
+          String role = event.snapshot.value as String;
+
+          if (role == "admin" || role == "moderator") {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminPage()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const MaisonScreen()),
+            );
+          }
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MaisonScreen()),
+          );
+        }
+      }).catchError((error) {
+        // Handle any errors in fetching the role
+        print("Error fetching role: $error");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      });
     }
   }
 

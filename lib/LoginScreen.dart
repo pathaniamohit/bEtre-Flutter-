@@ -55,15 +55,10 @@ class _LoginScreenState extends State<LoginScreen> {
           } else {
             // Navigate based on role
             final role = userData['role'];
-            if (role == "admin") {
+            if (role == "admin" || role == "moderator") {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const AdminPage()), // Kept const
-              );
-            } else if (role == "moderator") {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => ModeratorDashboard()),
               );
             } else {
               Navigator.pushReplacement(

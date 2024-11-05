@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'ProfileAdmin.dart';
 import 'FlaggedContentSection.dart';
 import 'PostsSection.dart';
+import 'ProifleAdmin.dart';
 import 'ReportsSection.dart';
 import 'UsersSection.dart';
 
@@ -41,9 +41,7 @@ class _AdminPageState extends State<AdminPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-      ),
+      appBar: AppBar(),
       // Use IndexedStack to maintain the state of each tab
       body: IndexedStack(
         index: _selectedIndex,
