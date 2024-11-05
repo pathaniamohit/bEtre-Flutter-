@@ -1,365 +1,398 @@
-import 'dart:async';
-import 'dart:io';
-import 'package:betreflutter/CommentScreen.dart';
+import 'package:betreflutter/Settings.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'PostDetailScreen.dart';
-import 'Settings.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 class ProfileAdmin extends StatefulWidget {
-  final DatabaseReference dbRef;
-
-  ProfileAdmin({Key? key, required this.dbRef}) : super(key: key);
-
   @override
   _ProfileAdminState createState() => _ProfileAdminState();
 }
 
 class _ProfileAdminState extends State<ProfileAdmin> {
+  final DatabaseReference databaseRef = FirebaseDatabase.instance.ref();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  User? _user;
-  String? _profileImageUrl;
-  String _username = "Username";
-  String _email = "Email";
-  int _photosCount = 0;
-  int _followersCount = 0;
-  int _followsCount = 0;
-
-  List<Map<String, dynamic>> _posts = [];
-  File? _image;
+  int suspendedCount = 0;
+  int activeCount = 0;
+  int totalPosts = 0;
+  int totalUsers = 0;
+  int totalLikes = 0;
+  int totalComments = 0;
+  int totalModerators = 0;
+  int uniqueReportedUsers = 0;
+  int reportedPosts = 0;
+  int reportedComments = 0;
+  int reportedProfiles = 0;
+  double malePercentage = 0;
+  double femalePercentage = 0;
+  String username = "Username";
+  String email = "Email";
+  String? profileImageUrl;
 
   @override
   void initState() {
     super.initState();
-    _user = _auth.currentUser;
-    if (_user != null) {
-      _loadUserProfile();
-      _loadUserStats();
-      _loadUserPosts();
-    }
+    fetchData();
+    fetchUserProfile();
+    fetchTotalReportedUsers();
+    fetchReportedData();
   }
 
-  Future<void> _loadUserProfile() async {
-    if (_user != null) {
-      widget.dbRef.child("users").child(_user!.uid).once().then((snapshot) {
+  void fetchData() {
+    fetchUserSuspensionData();
+    fetchGenderData();
+    fetchTotalUsers();
+    fetchTotalPosts();
+    fetchTotalLikes();
+    fetchTotalComments();
+    fetchTotalModerators();
+  }
+
+  Future<void> fetchUserProfile() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      databaseRef.child("users").child(user.uid).once().then((snapshot) {
         if (snapshot.snapshot.exists) {
           var userData = Map<String, dynamic>.from(snapshot.snapshot.value as Map);
           setState(() {
-            _username = userData['username'] ?? 'Username';
-            _email = userData['email'] ?? 'Email';
-            _profileImageUrl = userData['profileImageUrl'];
+            username = userData['username'] ?? 'Username';
+            email = userData['email'] ?? 'Email';
+            profileImageUrl = userData['profileImageUrl'];
           });
         }
       });
     }
   }
 
-  Future<void> _loadUserStats() async {
-    if (_user != null) {
-      widget.dbRef.child("followers").child(_user!.uid).onValue.listen((event) {
-        final dataSnapshot = event.snapshot;
-        setState(() {
-          _followersCount = dataSnapshot.exists ? dataSnapshot.children.length : 0;
-        });
-      });
+  Future<void> fetchTotalReportedUsers() async {
+    Set<String> uniqueReportedUserIds = {};
 
-      widget.dbRef.child("following").child(_user!.uid).onValue.listen((event) {
-        final dataSnapshot = event.snapshot;
-        setState(() {
-          _followsCount = dataSnapshot.exists ? dataSnapshot.children.length : 0;
-        });
-      });
-
-      widget.dbRef.child("posts").orderByChild("userId").equalTo(_user!.uid).onValue.listen((event) {
-        final dataSnapshot = event.snapshot;
-        setState(() {
-          _photosCount = dataSnapshot.exists ? dataSnapshot.children.length : 0;
-        });
-      });
-    }
-  }
-
-  Future<void> _loadUserPosts() async {
-    if (_user != null) {
-      widget.dbRef
-          .child("posts")
-          .orderByChild("userId")
-          .equalTo(_user!.uid)
-          .onValue
-          .listen((event) {
-        List<Map<String, dynamic>> posts = [];
-        for (var post in event.snapshot.children) {
-          var postData = Map<String, dynamic>.from(post.value as Map);
-          postData['postId'] = post.key;
-          posts.add(postData);
+    // Fetch reported users from "reports" node
+    await databaseRef.child("reports").get().then((snapshot) {
+      for (var report in snapshot.children) {
+        String? reportedUserId = report.child("reportedBy").value as String?;
+        if (reportedUserId != null) {
+          uniqueReportedUserIds.add(reportedUserId);
         }
-        setState(() {
-          _posts = posts.reversed.toList();
-        });
-      });
+      }
+    });
+
+    // Fetch reported users from "report_comments" node
+    await databaseRef.child("report_comments").get().then((snapshot) {
+      for (var report in snapshot.children) {
+        String? reportedUserId = report.child("reportedCommentUserId").value as String?;
+        if (reportedUserId != null) {
+          uniqueReportedUserIds.add(reportedUserId);
+        }
+      }
+    });
+
+    // Fetch reported users from "reported_profiles" node
+    await databaseRef.child("reported_profiles").get().then((snapshot) {
+      for (var report in snapshot.children) {
+        String? reportedUserId = report.child("reportedUserId").value as String?;
+        if (reportedUserId != null) {
+          uniqueReportedUserIds.add(reportedUserId);
+        }
+      }
+    });
+
+    // Validate each unique reported user ID
+    int validReportedUserCount = 0;
+    for (String userId in uniqueReportedUserIds) {
+      final snapshot = await databaseRef.child("users").child(userId).get();
+      if (snapshot.exists) {
+        validReportedUserCount++;
+      }
     }
+
+    setState(() {
+      uniqueReportedUsers = validReportedUserCount;
+    });
   }
 
-  Future<void> _pickImage() async {
-    final ImagePicker _picker = ImagePicker();
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null) {
+  Future<void> fetchUserSuspensionData() async {
+    databaseRef.child("users").onValue.listen((DatabaseEvent event) {
+      int suspended = 0;
+      int active = 0;
+      for (var user in event.snapshot.children) {
+        bool isSuspended = user.child("suspended").value as bool? ?? false;
+        if (isSuspended) {
+          suspended++;
+        } else {
+          active++;
+        }
+      }
       setState(() {
-        _image = File(image.path);
+        suspendedCount = suspended;
+        activeCount = active;
       });
-      _uploadProfileImage(_image!);
-    }
+    });
   }
 
-  Future<void> _uploadProfileImage(File image) async {
-    if (_user != null) {
-      try {
-        String path = 'users/${_user!.uid}/profile.jpg';
-        TaskSnapshot uploadTask = await _storage.ref(path).putFile(image);
-        String downloadUrl = await uploadTask.ref.getDownloadURL();
+  Future<void> fetchReportedData() async {
+    int postReports = 0;
+    int commentReports = 0;
+    int profileReports = 0;
 
-        widget.dbRef.child("users").child(_user!.uid).update({
-          "profileImageUrl": downloadUrl,
-        });
+    // Fetch reported posts
+    await databaseRef.child("reports").get().then((snapshot) {
+      for (var report in snapshot.children) {
+        String? type = report.child("type").value as String?;
+          postReports++;
 
-        setState(() {
-          _profileImageUrl = downloadUrl;
-        });
-
-        Fluttertoast.showToast(msg: "Profile image updated successfully", gravity: ToastGravity.BOTTOM);
-      } catch (e) {
-        Fluttertoast.showToast(msg: "Failed to upload profile image: $e", gravity: ToastGravity.BOTTOM);
       }
-    }
+    });
+
+    // Fetch reported comments
+    await databaseRef.child("report_comments").get().then((snapshot) {
+      commentReports = snapshot.children.length;
+    });
+
+    // Fetch reported profiles
+    await databaseRef.child("reported_profiles").get().then((snapshot) {
+      profileReports = snapshot.children.length;
+    });
+
+    setState(() {
+      reportedPosts = postReports;
+      reportedComments = commentReports;
+      reportedProfiles = profileReports;
+    });
   }
 
-  Future<void> _onPostTripleTap(String postId) async {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Delete Post'),
-          content: Text('Are you sure you want to delete this post?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                _deletePost(postId);
-                Navigator.pop(context);
-              },
-              child: Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _deletePost(String postId) async {
-    if (_user != null) {
-      await widget.dbRef.child("posts").child(postId).remove();
-      Fluttertoast.showToast(msg: "Post deleted successfully", gravity: ToastGravity.BOTTOM);
-      _loadUserPosts();
-    }
-  }
-
-  Future<void> _onPostDoubleTap(String postId, String currentContent) async {
-    TextEditingController _contentController = TextEditingController(text: currentContent);
-    File? selectedImage;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Edit Post'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _contentController,
-                decoration: InputDecoration(labelText: 'Edit Content'),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () async {
-                  final ImagePicker _picker = ImagePicker();
-                  final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                  if (image != null) {
-                    selectedImage = File(image.path);
-                    Fluttertoast.showToast(msg: "New image selected", gravity: ToastGravity.BOTTOM);
-                  }
-                },
-                child: Text("Change Image"),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                _updatePost(postId, _contentController.text.trim(), selectedImage);
-                Navigator.pop(context);
-              },
-              child: Text('Update'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _updatePost(String postId, String newContent, File? newImage) async {
-    if (_user != null) {
-      Map<String, dynamic> updatedData = {"content": newContent};
-
-      try {
-        if (newImage != null) {
-          String path = 'post_images/$postId.jpg';
-          TaskSnapshot uploadTask = await _storage.ref(path).putFile(newImage);
-          String downloadUrl = await uploadTask.ref.getDownloadURL();
-          updatedData['imageUrl'] = downloadUrl;
+  Future<void> fetchGenderData() async {
+    databaseRef.child("users").onValue.listen((DatabaseEvent event) {
+      int maleCount = 0;
+      int femaleCount = 0;
+      for (var user in event.snapshot.children) {
+        String gender = user.child("gender").value as String? ?? "";
+        if (gender.toLowerCase() == "male") {
+          maleCount++;
+        } else if (gender.toLowerCase() == "female") {
+          femaleCount++;
         }
-
-        await widget.dbRef.child("posts").child(postId).update(updatedData);
-        Fluttertoast.showToast(msg: "Post updated successfully", gravity: ToastGravity.BOTTOM);
-        _loadUserPosts();
-      } catch (e) {
-        Fluttertoast.showToast(msg: "Failed to update post: $e", gravity: ToastGravity.BOTTOM);
       }
-    }
+      int total = maleCount + femaleCount;
+      setState(() {
+        malePercentage = total > 0 ? (maleCount / total) * 100 : 0;
+        femalePercentage = total > 0 ? (femaleCount / total) * 100 : 0;
+      });
+    });
   }
 
-  void _viewPostDetails(Map<String, dynamic> post) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => PostDetailScreen(post: post, currentUser: _user)),
-    );
+  Future<void> fetchTotalUsers() async {
+    databaseRef.child("users").onValue.listen((DatabaseEvent event) {
+      int userCount = 0;
+
+      for (var user in event.snapshot.children) {
+        String? role = user.child("role").value as String?;
+        String? email = user.child("email").value as String?;
+
+        if (role != "admin" && role != "moderator" && email != null && email.isNotEmpty) {
+          userCount++;
+        }
+      }
+
+      setState(() {
+        totalUsers = userCount;
+      });
+    });
+  }
+
+
+  Future<void> fetchTotalPosts() async {
+    databaseRef.child("posts").onValue.listen((DatabaseEvent event) {
+      setState(() {
+        totalPosts = event.snapshot.children.length;
+      });
+    });
+  }
+
+  Future<void> fetchTotalLikes() async {
+    databaseRef.child("likes").onValue.listen((DatabaseEvent event) {
+      int likesCount = 0;
+      for (var post in event.snapshot.children) {
+        likesCount += post.child("users").children.length;
+      }
+      setState(() {
+        totalLikes = likesCount;
+      });
+    });
+  }
+
+  Future<void> fetchTotalComments() async {
+    databaseRef.child("comments").onValue.listen((DatabaseEvent event) {
+      setState(() {
+        totalComments = event.snapshot.children.length;
+      });
+    });
+  }
+
+  Future<void> fetchTotalModerators() async {
+    databaseRef.child("users").onValue.listen((DatabaseEvent event) {
+      int moderatorCount = 0;
+      for (var user in event.snapshot.children) {
+        String? role = user.child("role").value as String?;
+        if (role == "moderator") {
+          moderatorCount++;
+        }
+      }
+      setState(() {
+        totalModerators = moderatorCount;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: Text("Admin Dashboard"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SettingsScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Profile Section
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Stack(
-                alignment: Alignment.center,
+              child: Column(
                 children: [
-                  Text('My Profile', style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      iconSize: 36,
-                      icon: Icon(Icons.settings),
-                      onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => SettingsScreen()));
-                      },
-                    ),
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundImage: profileImageUrl != null
+                        ? NetworkImage(profileImageUrl!)
+                        : AssetImage('assets/profile_placeholder.png') as ImageProvider,
                   ),
+                  SizedBox(height: 8),
+                  Text(username, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(email, style: TextStyle(fontSize: 16, color: Colors.grey)),
                 ],
               ),
             ),
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundImage: _profileImageUrl != null
-                    ? NetworkImage(_profileImageUrl!)
-                    : AssetImage('assets/profile_placeholder.png') as ImageProvider,
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: Icon(Icons.camera_alt, size: 24, color: Colors.white),
-                ),
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(_username, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(_email, style: TextStyle(fontSize: 16, color: Colors.grey)),
+            SizedBox(height: 20),
+            // Stats Cards Section
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildStatItem('Photos', _photosCount.toString()),
-                  _buildStatItem('Followers', _followersCount.toString()),
-                  _buildStatItem('Follows', _followsCount.toString()),
+                  StatsCard(title: "Total Users", value: totalUsers, color: Colors.blue),
+                  StatsCard(title: "Total Posts", value: totalPosts, color: Colors.green),
+                  StatsCard(title: "Total Likes", value: totalLikes, color: Colors.orange),
                 ],
               ),
             ),
-            GridView.builder(
-              physics: NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  StatsCard(title: "Total Comments", value: totalComments, color: Colors.purple),
+                  StatsCard(title: "Reported Users", value: uniqueReportedUsers, color: Colors.red),
+                ],
               ),
-              itemCount: _posts.length,
-              itemBuilder: (context, index) {
-                final post = _posts[index];
-                return GestureDetector(
-                  onTap: () => _viewPostDetails(post),
-                  onDoubleTap: () => _onPostDoubleTap(post['postId'], post['content']),
-                  onLongPress: () => _onPostTripleTap(post['postId']),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.network(post['imageUrl'], fit: BoxFit.cover),
-                      Positioned(
-                        bottom: 4,
-                        left: 4,
-                        child: Row(
-                          children: [
-                            Icon(Icons.favorite, color: Colors.redAccent, size: 16),
-                            SizedBox(width: 2),
-                            Text('${post['likesCount']}', style: TextStyle(color: Colors.white, fontSize: 12)),
-                            SizedBox(width: 8),
-                            Icon(Icons.comment, color: Colors.white, size: 16),
-                            SizedBox(width: 2),
-                            Text('${post['commentsCount']}', style: TextStyle(color: Colors.white, fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            ),
+            SizedBox(height: 20),
+            // Suspended vs Active Users Pie Chart
+            Text("Suspended vs Active Users", textAlign: TextAlign.center),
+            SfCircularChart(
+              series: <CircularSeries>[
+                PieSeries<_ChartData, String>(
+                  dataSource: [
+                    _ChartData('Suspended', suspendedCount.toDouble()),
+                    _ChartData('Active', activeCount.toDouble()),
+                  ],
+                  xValueMapper: (_ChartData data, _) => data.label,
+                  yValueMapper: (_ChartData data, _) => data.value,
+                  dataLabelSettings: DataLabelSettings(isVisible: true),
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+            // Reported Data Overview Bar Chart
+            Text("Reported Data Overview", textAlign: TextAlign.center),
+            SfCartesianChart(
+              primaryXAxis: CategoryAxis(),
+              series: <ChartSeries>[
+                ColumnSeries<_ChartData, String>(
+                  dataSource: [
+                    _ChartData('Posts', reportedPosts.toDouble()),
+                    _ChartData('Comments', reportedComments.toDouble()),
+                    _ChartData('Profiles', reportedProfiles.toDouble()),
+                  ],
+                  xValueMapper: (_ChartData data, _) => data.label,
+                  yValueMapper: (_ChartData data, _) => data.value,
+                  dataLabelSettings: DataLabelSettings(isVisible: true),
+                  color: Colors.purpleAccent,
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+            // Gender Distribution Pie Chart
+            Text("Gender Distribution", textAlign: TextAlign.center),
+            SfCircularChart(
+              series: <CircularSeries>[
+                PieSeries<_ChartData, String>(
+                  dataSource: [
+                    _ChartData('Male', malePercentage),
+                    _ChartData('Female', femalePercentage),
+                  ],
+                  xValueMapper: (_ChartData data, _) => data.label,
+                  yValueMapper: (_ChartData data, _) => data.value,
+                  dataLabelSettings: DataLabelSettings(isVisible: true),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildStatItem(String label, String count) {
-    return Column(
-      children: [
-        Text(count, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(label, style: TextStyle(color: Colors.grey)),
-      ],
+// Stats Card for displaying key metrics
+class StatsCard extends StatelessWidget {
+  final String title;
+  final int value;
+  final Color color;
+
+  StatsCard({required this.title, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Text(title, style: TextStyle(fontSize: 16, color: Colors.grey)),
+              SizedBox(height: 8),
+              Text("$value", style: TextStyle(fontSize: 24, color: color, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
     );
   }
+}
+
+class _ChartData {
+  _ChartData(this.label, this.value);
+  final String label;
+  final double value;
 }
