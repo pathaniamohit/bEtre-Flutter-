@@ -1,215 +1,8 @@
-// NotificationsScreen.dart
-
-// import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:firebase_database/firebase_database.dart';
-// import 'PostDetailScreen.dart';
-//
-// class NotificationsScreen extends StatefulWidget {
-//   @override
-//   _NotificationsScreenState createState() => _NotificationsScreenState();
-// }
-//
-// class _NotificationsScreenState extends State<NotificationsScreen> {
-//   final FirebaseAuth _auth = FirebaseAuth.instance;
-//   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
-//   User? _user;
-//
-//   List<Map<String, dynamic>> _notifications = [];
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _user = _auth.currentUser;
-//     if (_user != null) {
-//       _loadNotifications();
-//     }
-//   }
-//
-//   /// Loads notifications from the 'notifications' node
-//   void _loadNotifications() {
-//     _dbRef.child('notifications').child(_user!.uid).orderByChild('timestamp').onValue.listen((event) {
-//       List<Map<String, dynamic>> notifications = [];
-//       if (event.snapshot.exists) {
-//         for (var notificationSnapshot in event.snapshot.children) {
-//           Map<String, dynamic> notificationData = Map<String, dynamic>.from(notificationSnapshot.value as Map);
-//           notificationData['notificationId'] = notificationSnapshot.key;
-//           notifications.add(notificationData);
-//         }
-//         // Sort notifications by timestamp descending
-//         notifications.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
-//
-//         setState(() {
-//           _notifications = notifications;
-//         });
-//       } else {
-//         setState(() {
-//           _notifications = [];
-//         });
-//       }
-//     }, onError: (error) {
-//       print('Error loading notifications: $error');
-//       // Optionally, display an error message to the user
-//     });
-//   }
-//
-//   /// Fetches user information based on userId
-//   Future<Map<String, dynamic>> _getUserInfo(String userId) async {
-//     DataSnapshot snapshot = await _dbRef.child('users').child(userId).get();
-//     if (snapshot.exists) {
-//       Map<String, dynamic> userData = Map<String, dynamic>.from(snapshot.value as Map);
-//       return userData;
-//     } else {
-//       return {'username': 'Unknown User', 'profileImageUrl': null};
-//     }
-//   }
-//
-//   /// Navigates to PostDetailScreen
-//   void _viewPostDetails(String postId) async {
-//     DataSnapshot postSnapshot = await _dbRef.child('posts').child(postId).get();
-//     if (postSnapshot.exists) {
-//       Map<String, dynamic> postData = Map<String, dynamic>.from(postSnapshot.value as Map);
-//       postData['postId'] = postId;
-//       Navigator.push(
-//         context,
-//         MaterialPageRoute(builder: (context) => PostDetailScreen(post: postData, currentUser: _user)),
-//       );
-//     } else {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Post not found')),
-//       );
-//     }
-//   }
-//
-//   /// Marks a notification as read
-//   Future<void> _markAsRead(String notificationId) async {
-//     await _dbRef.child('notifications').child(_user!.uid).child(notificationId).update({'read': true});
-//   }
-//
-//   /// Builds individual notification tiles based on their type
-//   Widget _buildNotificationTile(Map<String, dynamic> notification) {
-//     bool isWarning = notification['type'] == 'warning';
-//     String action = notification['action'] ?? '';
-//     String fromUserId = notification['fromUserId'] ?? '';
-//     String? postId = notification['postId'];
-//     bool isRead = notification['read'] ?? false;
-//
-//     return FutureBuilder(
-//       future: _getUserInfo(fromUserId),
-//       builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-//         if (snapshot.connectionState == ConnectionState.waiting) {
-//           return ListTile(
-//             leading: CircleAvatar(child: CircularProgressIndicator()),
-//             title: Text('Loading...'),
-//           );
-//         } else if (snapshot.hasError || !snapshot.hasData) {
-//           return ListTile(
-//             leading: CircleAvatar(child: Icon(Icons.error)),
-//             title: Text('Error loading user'),
-//           );
-//         } else {
-//           String username = snapshot.data!['username'] ?? 'Unknown User';
-//           String? profileImageUrl = snapshot.data!['profileImageUrl'];
-//           String? message = '';
-//
-//           // Determine the message based on the action
-//           switch (action) {
-//             case 'liked your post':
-//               message = '$username liked your post.';
-//               break;
-//             case 'unliked your post':
-//               message = '$username unliked your post.';
-//               break;
-//             case 'commented on your post':
-//               String commentContent = notification['commentContent'] ?? '';
-//               message = '$username commented: "$commentContent"';
-//               break;
-//             case 'started following you':
-//               message = '$username started following you.';
-//               break;
-//             case 'unfollowed you':
-//               message = '$username unfollowed you.';
-//               break;
-//             case 'warning':
-//               message = notification['message'] ?? 'You have received a warning.';
-//               break;
-//             default:
-//               message = 'You have a new notification.';
-//           }
-//
-//           // Optionally, handle navigation based on action
-//           void _handleTap() {
-//             if (!isWarning && postId != null) {
-//               _viewPostDetails(postId);
-//               _markAsRead(notification['notificationId']);
-//             }
-//             // Add more navigation based on different actions if needed
-//           }
-//
-//           return ListTile(
-//             leading: isWarning
-//                 ? CircleAvatar(
-//               backgroundColor: Colors.red,
-//               child: Icon(Icons.warning, color: Colors.white),
-//             )
-//                 : CircleAvatar(
-//               backgroundImage: profileImageUrl != null
-//                   ? NetworkImage(profileImageUrl)
-//                   : AssetImage('assets/profile_placeholder.png') as ImageProvider,
-//             ),
-//             // title: Text(
-//             //   isWarning ? 'Warning from Admin' : message,
-//             //   style: TextStyle(
-//             //     fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-//             //     color: isWarning ? Colors.red : Colors.black,
-//             //   ),
-//             // ),
-//             subtitle: Text(
-//               DateTime.fromMillisecondsSinceEpoch(notification['timestamp']).toLocal().toString(),
-//               style: TextStyle(fontSize: 12, color: Colors.grey),
-//             ),
-//             trailing: !isRead
-//                 ? Icon(Icons.circle, color: Colors.blue, size: 10)
-//                 : null,
-//             onTap: isWarning ? null : _handleTap,
-//           );
-//         }
-//       },
-//     );
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('Notifications'),
-//       ),
-//       body: _notifications.isNotEmpty
-//           ? ListView.builder(
-//         itemCount: _notifications.length,
-//         itemBuilder: (context, index) {
-//           var notification = _notifications[index];
-//           return _buildNotificationTile(notification);
-//         },
-//       )
-//           : Center(
-//         child: Text(
-//           'No notifications yet.',
-//           style: TextStyle(color: Colors.grey, fontSize: 16),
-//         ),
-//       ),
-//     );
-//   }
-// }
-// NotificationsScreen.dart
-
-// NotificationsScreen.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 import 'PostDetailScreen.dart';
-import 'package:intl/intl.dart'; // For better date formatting
 
 class NotificationsScreen extends StatefulWidget {
   @override
@@ -227,183 +20,247 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _user = _auth.currentUser;
+    print("Current user ID: ${_user?.uid}");
     if (_user != null) {
-      _loadNotifications();
+      _loadAllNotifications();
+    } else {
+      print("User not authenticated. Notifications will not load.");
     }
   }
 
-  /// Loads notifications from the 'notifications' node
-  void _loadNotifications() {
-    _dbRef.child('notifications').child(_user!.uid).orderByChild('timestamp').onValue.listen((event) {
-      List<Map<String, dynamic>> notifications = [];
-      if (event.snapshot.exists) {
-        for (var notificationSnapshot in event.snapshot.children) {
-          Map<String, dynamic> notificationData = Map<String, dynamic>.from(notificationSnapshot.value as Map);
-          notificationData['notificationId'] = notificationSnapshot.key;
-          notifications.add(notificationData);
-        }
-        // Sort notifications by timestamp descending
-        notifications.sort((a, b) {
-          int timestampA = _convertTimestamp(a['timestamp']);
-          int timestampB = _convertTimestamp(b['timestamp']);
-          return timestampB.compareTo(timestampA);
-        });
+  /// Loads all notifications by fetching different types from multiple nodes.
+  void _loadAllNotifications() async {
+    List<Map<String, dynamic>> loadedNotifications = [];
+    print("Starting to load all notifications...");
 
-        setState(() {
-          _notifications = notifications;
-        });
-      } else {
-        setState(() {
-          _notifications = [];
-        });
-      }
-    }, onError: (error) {
-      print('Error loading notifications: $error');
-      // Optionally, display an error message to the user
+    // Load notifications in parallel
+    await Future.wait([
+      _loadFollowNotifications(loadedNotifications),
+      _loadLikeNotifications(loadedNotifications),
+      _loadCommentNotifications(loadedNotifications),
+      _loadWarningNotifications(loadedNotifications),
+    ]);
+
+    // Sort notifications by timestamp
+    loadedNotifications.sort((a, b) {
+      int timestampA = _convertTimestamp(a['timestamp']);
+      int timestampB = _convertTimestamp(b['timestamp']);
+      return timestampB.compareTo(timestampA);
     });
+
+    setState(() {
+      _notifications = loadedNotifications;
+    });
+    print("All notifications loaded: ${_notifications.length}");
+  }
+
+  /// Loads follow notifications
+  Future<void> _loadFollowNotifications(List<Map<String, dynamic>> notifications) async {
+    print("Loading follow notifications...");
+    try {
+      final followersRef = _dbRef.child('followers').child(_user!.uid);
+      final snapshot = await followersRef.get();
+
+      if (snapshot.exists) {
+        for (var followerSnapshot in snapshot.children) {
+          if (followerSnapshot.value == true) {
+            String followerId = followerSnapshot.key!;
+            String username = await _fetchUsername(followerId);
+
+            notifications.add({
+              'type': 'follow',
+              'userId': followerId,
+              'timestamp': DateTime.now().millisecondsSinceEpoch,
+              'username': username,
+              'message': '$username started following you.'
+            });
+          }
+        }
+        print("Follow notifications loaded: ${notifications.length}");
+      } else {
+        print("No follow notifications found.");
+      }
+    } catch (e) {
+      print("Error loading follow notifications: $e");
+    }
+  }
+
+  /// Loads like notifications
+  Future<void> _loadLikeNotifications(List<Map<String, dynamic>> notifications) async {
+    print("Loading like notifications...");
+    try {
+      final likesRef = _dbRef.child('likes');
+      final snapshot = await likesRef.get();
+
+      if (snapshot.exists) {
+        for (var postSnapshot in snapshot.children) {
+          String postId = postSnapshot.key!;
+          String? postOwnerId = postSnapshot.child('ownerId').value as String?;
+
+          if (postOwnerId == _user!.uid) {
+            for (var userSnapshot in postSnapshot.child('users').children) {
+              String likerUserId = userSnapshot.key!;
+              int likedAt = _convertTimestamp(userSnapshot.child('likedAt').value);
+              String likerUsername = await _fetchUsername(likerUserId);
+
+              notifications.add({
+                'type': 'like',
+                'userId': likerUserId,
+                'postId': postId,
+                'timestamp': likedAt,
+                'username': likerUsername,
+                'message': '$likerUsername liked your post.'
+              });
+            }
+          } else {
+            print("Post $postId does not belong to the current user, skipping.");
+          }
+        }
+        print("Like notifications loaded: ${notifications.length}");
+      } else {
+        print("No like notifications found.");
+      }
+    } catch (e) {
+      print("Error loading like notifications: $e");
+    }
+  }
+
+  /// Loads comment notifications
+  Future<void> _loadCommentNotifications(List<Map<String, dynamic>> notifications) async {
+    print("Loading comment notifications...");
+    try {
+      final commentsRef = _dbRef.child('comments');
+      final snapshot = await commentsRef.get();
+
+      if (snapshot.exists) {
+        for (var commentSnapshot in snapshot.children) {
+          Map<String, dynamic> commentData = Map<String, dynamic>.from(commentSnapshot.value as Map);
+          String postId = commentData['post_Id'];
+          String commenterId = commentData['userId'];
+          String commentContent = commentData['content'];
+          int timestamp = _convertTimestamp(commentData['timestamp']);
+          String commenterUsername = await _fetchUsername(commenterId);
+
+          final postOwnerId = (await _dbRef.child('posts').child(postId).child('userId').get()).value;
+          if (postOwnerId == _user!.uid) {
+            notifications.add({
+              'type': 'comment',
+              'userId': commenterId,
+              'postId': postId,
+              'timestamp': timestamp,
+              'username': commenterUsername,
+              'commentContent': commentContent,
+              'message': '$commenterUsername commented: "$commentContent"'
+            });
+          } else {
+            print("Post $postId does not belong to the current user, skipping.");
+          }
+        }
+        print("Comment notifications loaded: ${notifications.length}");
+      } else {
+        print("No comment notifications found.");
+      }
+    } catch (e) {
+      print("Error loading comment notifications: $e");
+    }
+  }
+
+  /// Loads warning notifications
+  Future<void> _loadWarningNotifications(List<Map<String, dynamic>> notifications) async {
+    print("Loading warning notifications...");
+    try {
+      final warningsRef = _dbRef.child('warnings').child(_user!.uid);
+      final snapshot = await warningsRef.get();
+
+      if (snapshot.exists) {
+        for (var warningSnapshot in snapshot.children) {
+          Map<String, dynamic> warningData = Map<String, dynamic>.from(warningSnapshot.value as Map);
+          String reason = warningData['reason'];
+          int timestamp = _convertTimestamp(warningData['timestamp']);
+
+          notifications.add({
+            'type': 'warning',
+            'timestamp': timestamp,
+            'message': 'Admin warned you: $reason'
+          });
+        }
+        print("Warning notifications loaded: ${notifications.length}");
+      } else {
+        print("No warning notifications found.");
+      }
+    } catch (e) {
+      print("Error loading warning notifications: $e");
+    }
+  }
+
+  /// Fetches a user's username
+  Future<String> _fetchUsername(String userId) async {
+    try {
+      final userSnapshot = await _dbRef.child('users').child(userId).child('username').get();
+      return userSnapshot.value as String? ?? 'Unknown User';
+    } catch (e) {
+      print("Error fetching username for user $userId: $e");
+      return 'Unknown User';
+    }
   }
 
   /// Converts timestamp to int, handling both int and double types
   int _convertTimestamp(dynamic timestamp) {
-    if (timestamp is int) {
-      return timestamp;
-    } else if (timestamp is double) {
-      return timestamp.toInt();
-    } else {
-      // Handle unexpected types or provide a default value
-      return 0;
-    }
-  }
-
-  /// Fetches user information based on userId
-  Future<Map<String, dynamic>> _getUserInfo(String userId) async {
-    DataSnapshot snapshot = await _dbRef.child('users').child(userId).get();
-    if (snapshot.exists) {
-      Map<String, dynamic> userData = Map<String, dynamic>.from(snapshot.value as Map);
-      return userData;
-    } else {
-      return {'username': 'Unknown User', 'profileImageUrl': null};
-    }
-  }
-
-  /// Navigates to PostDetailScreen
-  void _viewPostDetails(String postId) async {
-    DataSnapshot postSnapshot = await _dbRef.child('posts').child(postId).get();
-    if (postSnapshot.exists) {
-      Map<String, dynamic> postData = Map<String, dynamic>.from(postSnapshot.value as Map);
-      postData['postId'] = postId;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => PostDetailScreen(post: postData, currentUser: _user)),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Post not found')),
-      );
-    }
-  }
-
-  /// Marks a notification as read
-  Future<void> _markAsRead(String notificationId) async {
-    await _dbRef.child('notifications').child(_user!.uid).child(notificationId).update({'read': true});
+    if (timestamp is int) return timestamp;
+    if (timestamp is double) return timestamp.toInt();
+    return 0;
   }
 
   /// Formats timestamp to a readable date string
   String _formatTimestamp(int timestamp) {
     DateTime date = DateTime.fromMillisecondsSinceEpoch(timestamp).toLocal();
-    return DateFormat('yyyy-MM-dd – kk:mm').format(date);
+    return DateFormat('h:mm a').format(date); // 12-hour format with AM/PM
   }
 
   /// Builds individual notification tiles based on their type
   Widget _buildNotificationTile(Map<String, dynamic> notification) {
-    bool isWarning = notification['type'] == 'warning';
-    String action = notification['action'] ?? '';
-    String fromUserId = notification['fromUserId'] ?? '';
-    String? postId = notification['postId'];
-    bool isRead = notification['read'] ?? false;
+    String message = notification['message'];
     int timestamp = _convertTimestamp(notification['timestamp']);
+    bool isWarning = notification['type'] == 'warning';
 
-    return FutureBuilder(
-      future: _getUserInfo(fromUserId),
-      builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return ListTile(
-            leading: CircleAvatar(child: CircularProgressIndicator()),
-            title: Text('Loading...'),
-          );
-        } else if (snapshot.hasError || !snapshot.hasData) {
-          return ListTile(
-            leading: CircleAvatar(child: Icon(Icons.error)),
-            title: Text('Error loading user'),
-          );
-        } else {
-          String username = snapshot.data!['username'] ?? 'Unknown User';
-          String? profileImageUrl = snapshot.data!['profileImageUrl'];
-          String message = '';
-
-          // Determine the message based on the action
-          switch (action) {
-            case 'liked your post':
-              message = '$username liked your post.';
-              break;
-            case 'unliked your post':
-              message = '$username unliked your post.';
-              break;
-            case 'commented on your post':
-              String commentContent = notification['commentContent'] ?? '';
-              message = '$username commented: "$commentContent"';
-              break;
-            case 'started following you':
-              message = '$username started following you.';
-              break;
-            case 'unfollowed you':
-              message = '$username unfollowed you.';
-              break;
-            case 'warning':
-              message = notification['message'] ?? 'You have received a warning.';
-              break;
-            default:
-              message = 'You have a new notification.';
-          }
-
-          // Optionally, handle navigation based on action
-          void _handleTap() {
-            if (!isWarning && postId != null) {
-              _viewPostDetails(postId);
-              _markAsRead(notification['notificationId']);
-            }
-            // Add more navigation based on different actions if needed
-          }
-
-          return ListTile(
-            leading: isWarning
-                ? CircleAvatar(
-              backgroundColor: Colors.red,
-              child: Icon(Icons.warning, color: Colors.white),
-            )
-                : CircleAvatar(
-              backgroundImage: profileImageUrl != null
-                  ? NetworkImage(profileImageUrl)
-                  : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: Offset(0, 3),
             ),
-            title: Text(
-              isWarning ? 'Warning from Admin' : message,
-              style: TextStyle(
-                fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                color: isWarning ? Colors.red : Colors.black,
-              ),
+          ],
+        ),
+        child: ListTile(
+          contentPadding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+          leading: isWarning
+              ? CircleAvatar(
+            backgroundColor: Colors.red,
+            child: Icon(Icons.warning, color: Colors.white),
+          )
+              : CircleAvatar(
+            backgroundImage: AssetImage('assets/profile_placeholder.png'),
+          ),
+          title: Text(
+            message,
+            style: TextStyle(
+              fontWeight: isWarning ? FontWeight.bold : FontWeight.normal,
+              color: isWarning ? Colors.red : Colors.black,
             ),
-            subtitle: Text(
-              _formatTimestamp(timestamp),
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            trailing: !isRead
-                ? Icon(Icons.circle, color: Colors.blue, size: 10)
-                : null,
-            onTap: isWarning ? null : _handleTap,
-          );
-        }
-      },
+          ),
+          subtitle: Text(
+            _formatTimestamp(timestamp),
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ),
+      ),
     );
   }
 
@@ -412,13 +269,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Notifications'),
+        centerTitle: true,
       ),
       body: _notifications.isNotEmpty
           ? ListView.builder(
         itemCount: _notifications.length,
         itemBuilder: (context, index) {
-          var notification = _notifications[index];
-          return _buildNotificationTile(notification);
+          return _buildNotificationTile(_notifications[index]);
         },
       )
           : Center(
