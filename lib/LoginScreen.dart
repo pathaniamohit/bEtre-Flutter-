@@ -7,7 +7,7 @@ import 'ForgotPasswordScreen.dart';
 import 'RegisterScreen.dart';
 import 'maison.dart';
 import 'AdminPage.dart';
-import 'ModeratorDashboard.dart'; // Moderator page
+import 'ModeratorDashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -41,24 +41,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
       User? user = _auth.currentUser;
       if (user != null) {
-        final userSnapshot = await _dbRef.child('users/${user.uid}').get();
+        final userRef = _dbRef.child('users/${user.uid}');
+        final userSnapshot = await userRef.get();
 
         if (userSnapshot.exists) {
           final userData = userSnapshot.value as Map<dynamic, dynamic>;
 
-          // Check for suspension
+          // Check if the user is suspended
           if (userData['suspended'] == true) {
-            await _auth.signOut(); // Sign the user out
+            await _auth.signOut();
             setState(() {
               _errorMessage = 'Your account has been suspended. Please contact support.';
             });
           } else {
+            await userRef.update({'isOnline': true});
+
             // Navigate based on role
             final role = userData['role'];
             if (role == "admin" || role == "moderator") {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const AdminPage()), // Kept const
+                MaterialPageRoute(builder: (context) => const AdminPage()),
               );
             } else {
               Navigator.pushReplacement(
