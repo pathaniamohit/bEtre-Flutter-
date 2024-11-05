@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
-import 'package:firebase_core/firebase_core.dart'; // Import Firebase Core
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class UsersSection extends StatefulWidget {
   final DatabaseReference dbRef;
@@ -16,13 +16,13 @@ class UsersSection extends StatefulWidget {
 
 class _UsersSectionState extends State<UsersSection> {
   String _searchQuery = "";
-  bool _isAdmin = false; // Track if current user is admin
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _initializeFirebase();
-    _checkAdminPrivileges(); // Check if current user is admin
+    _checkUserRole();
   }
 
   // Initialize Firebase
@@ -30,25 +30,27 @@ class _UsersSectionState extends State<UsersSection> {
     await Firebase.initializeApp();
   }
 
-  // Function to check if current user is admin
-  Future<void> _checkAdminPrivileges() async {
+  // Check if the logged-in user is an admin
+  Future<void> _checkUserRole() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      // Force token refresh to get latest claims
-      await user.getIdToken(true);
-      final idTokenResult = await user.getIdTokenResult();
-      setState(() {
-        _isAdmin = idTokenResult.claims?['admin'] ?? false;
-      });
+      final userSnapshot = await widget.dbRef.child('users').child(user.uid).get();
+      if (userSnapshot.exists) {
+        final userData = Map<String, dynamic>.from(userSnapshot.value as Map);
+        setState(() {
+          _isAdmin = userData['role'] == 'admin';
+        });
+      }
     }
   }
 
-  // Function to toggle suspension status
-  Future<void> toggleSuspension(String userId, bool suspended) async {
+  // Toggle suspension status by updating the user's role
+  Future<void> toggleSuspension(String userId, bool isSuspended) async {
     try {
-      await widget.dbRef.child('users').child(userId).update({'suspended': suspended});
+      final newRole = isSuspended ? 'user' : 'suspended';
+      await widget.dbRef.child('users').child(userId).update({'role': newRole});
       Fluttertoast.showToast(
-          msg: suspended ? 'User suspended' : 'User unsuspended',
+          msg: isSuspended ? 'User unsuspended' : 'User suspended',
           gravity: ToastGravity.BOTTOM);
     } catch (e) {
       Fluttertoast.showToast(
@@ -57,69 +59,40 @@ class _UsersSectionState extends State<UsersSection> {
     }
   }
 
-  // Function to delete a user
+  // Delete a user
   Future<void> deleteUser(String userId) async {
     bool confirm = await _showDeleteConfirmationDialog();
     if (!confirm) return;
 
-    setState(() {
-      // Optional: Show a loading indicator or disable UI interactions
-    });
-
     try {
-      // 1. Delete user data from 'users' node
       await widget.dbRef.child('users').child(userId).remove();
 
-      // 2. Delete user posts
-      DataSnapshot postsSnapshot = await widget.dbRef
-          .child('posts')
-          .orderByChild('userId')
-          .equalTo(userId)
-          .get();
-      if (postsSnapshot.exists) {
-        for (var post in postsSnapshot.children) {
-          await widget.dbRef.child('posts').child(post.key!).remove();
+      // Delete user posts, followers, and following data
+      await widget.dbRef.child('posts').orderByChild('userId').equalTo(userId).get().then((snapshot) {
+        for (var post in snapshot.children) {
+          widget.dbRef.child('posts').child(post.key!).remove();
         }
-      }
-
-      // 3. Delete followers
+      });
       await widget.dbRef.child('followers').child(userId).remove();
-
-      // 4. Delete following
       await widget.dbRef.child('following').child(userId).remove();
 
-      // 5. Delete user from Firebase Auth via Cloud Function
+      // Delete user from Firebase Auth via Cloud Function
       await _deleteUserAuth(userId);
 
-      Fluttertoast.showToast(
-          msg: "User deleted successfully",
-          gravity: ToastGravity.BOTTOM);
-
+      Fluttertoast.showToast(msg: "User deleted successfully", gravity: ToastGravity.BOTTOM);
     } catch (e) {
-      Fluttertoast.showToast(
-          msg: "Error deleting user: $e",
-          gravity: ToastGravity.BOTTOM);
-    } finally {
-      setState(() {
-        // Optional: Hide the loading indicator or re-enable UI interactions
-      });
+      Fluttertoast.showToast(msg: "Error deleting user: $e", gravity: ToastGravity.BOTTOM);
     }
   }
 
-  // Function to call Cloud Function to delete user from Firebase Auth
+  // Call Cloud Function to delete user from Firebase Auth
   Future<void> _deleteUserAuth(String userId) async {
     try {
-      HttpsCallable callable =
-      FirebaseFunctions.instance.httpsCallable('deleteUserAuth');
-      final response = await callable.call({'uid': userId});
-      Fluttertoast.showToast(
-          msg: response.data['message'],
-          gravity: ToastGravity.BOTTOM);
+      HttpsCallable callable = FirebaseFunctions.instance.httpsCallable('deleteUserAuth');
+      await callable.call({'uid': userId});
+      Fluttertoast.showToast(msg: "User removed from Auth", gravity: ToastGravity.BOTTOM);
     } catch (e) {
-      Fluttertoast.showToast(
-          msg: "Error deleting user from Auth: $e",
-          gravity: ToastGravity.BOTTOM);
-      throw e; // Re-throw to handle in deleteUser()
+      Fluttertoast.showToast(msg: "Error deleting user from Auth: $e", gravity: ToastGravity.BOTTOM);
     }
   }
 
@@ -130,8 +103,7 @@ class _UsersSectionState extends State<UsersSection> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Delete User'),
-          content: Text(
-              'Are you sure you want to delete this user? This action cannot be undone.'),
+          content: Text('Are you sure you want to delete this user? This action cannot be undone.'),
           actions: [
             TextButton(
               child: Text('Cancel'),
@@ -149,14 +121,13 @@ class _UsersSectionState extends State<UsersSection> {
         );
       },
     ) ??
-        false; // Return false if dialog is dismissed
+        false;
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Search Bar
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextField(
@@ -174,7 +145,6 @@ class _UsersSectionState extends State<UsersSection> {
             },
           ),
         ),
-        // Users List
         Expanded(
           child: StreamBuilder(
             stream: widget.dbRef.child('users').onValue,
@@ -187,15 +157,12 @@ class _UsersSectionState extends State<UsersSection> {
                 return Center(child: Text("No users available."));
               }
 
-              final data = Map<String, dynamic>.from(
-                  (snapshot.data! as DatabaseEvent).snapshot.value as Map);
-
+              final data = Map<String, dynamic>.from((snapshot.data! as DatabaseEvent).snapshot.value as Map);
               final filteredData = data.entries.where((entry) {
                 final userData = Map<String, dynamic>.from(entry.value);
                 final username = userData['username']?.toLowerCase() ?? '';
                 final email = userData['email']?.toLowerCase() ?? '';
-                return username.contains(_searchQuery) ||
-                    email.contains(_searchQuery);
+                return username.contains(_searchQuery) || email.contains(_searchQuery);
               }).toList();
 
               if (filteredData.isEmpty) {
@@ -205,27 +172,27 @@ class _UsersSectionState extends State<UsersSection> {
               return ListView(
                 children: filteredData.map((entry) {
                   final userData = Map<String, dynamic>.from(entry.value);
-                  final bool isSuspended = userData['suspended'] == true;
+                  final isOnline = userData['isOnline'] == true;
+                  final isSuspended = userData['role'] == 'suspended';
 
                   return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: isOnline ? Colors.green : Colors.grey,
+                      radius: 6,
+                    ),
                     title: Text(userData['username'] ?? 'Unknown'),
                     subtitle: Text(userData['email'] ?? 'No email'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Suspension Toggle Button
                         IconButton(
                           icon: Icon(
                             isSuspended ? Icons.lock : Icons.lock_open,
                             color: isSuspended ? Colors.red : Colors.green,
                           ),
-                          tooltip: isSuspended
-                              ? 'Unsuspend User'
-                              : 'Suspend User',
-                          onPressed: () => toggleSuspension(
-                              entry.key, userData['suspended'] != true),
+                          tooltip: isSuspended ? 'Unsuspend User' : 'Suspend User',
+                          onPressed: () => toggleSuspension(entry.key, isSuspended),
                         ),
-                        // Delete Button (Visible only if current user is an admin)
                         if (_isAdmin)
                           IconButton(
                             icon: Icon(Icons.delete, color: Colors.red),

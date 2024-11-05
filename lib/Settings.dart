@@ -114,8 +114,12 @@ class SettingsScreen extends StatelessWidget {
             ),
             CupertinoDialogAction(
               isDestructiveAction: true,
-              onPressed: () {
-                _auth.signOut();
+              onPressed: () async {
+                final user = _auth.currentUser;
+                if (user != null) {
+                  await _database.child('users').child(user.uid).update({'isOnline': false});
+                }
+                await _auth.signOut();
                 Navigator.of(context).pop();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => LoginScreen()),
