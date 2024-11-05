@@ -34,6 +34,9 @@ class _SplashScreenState extends State<SplashScreen> {
       // User is signed in, fetch their role from the database
       final DatabaseReference userRef = FirebaseDatabase.instance.ref().child('users').child(user.uid);
 
+      // Set the isOnline status to true
+      await userRef.update({'isOnline': true});
+
       userRef.child('role').once().then((DatabaseEvent event) {
         if (event.snapshot.exists) {
           String role = event.snapshot.value as String;

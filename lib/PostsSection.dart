@@ -97,30 +97,43 @@ class _PostsSectionState extends State<PostsSection> {
 
   /// Deletes a specific post and all its associated comments
   Future<void> deletePost(String postId) async {
-    await widget.dbRef.child('posts').child(postId).remove(); // Remove the post
+    try {
+      // Remove the post
+      await widget.dbRef.child('posts').child(postId).remove();
+      print("Post with ID $postId deleted successfully.");
 
-    // Remove associated comments
-    final commentsSnapshot = await widget.dbRef.child('comments').orderByChild('post_Id').equalTo(postId).get();
-    if (commentsSnapshot.exists) {
-      for (var commentSnapshot in commentsSnapshot.children) {
-        await widget.dbRef.child('comments').child(commentSnapshot.key!).remove();
+      // Remove associated comments
+      final commentsSnapshot = await widget.dbRef.child('comments').orderByChild('post_Id').equalTo(postId).get();
+      if (commentsSnapshot.exists) {
+        for (var commentSnapshot in commentsSnapshot.children) {
+          await widget.dbRef.child('comments').child(commentSnapshot.key!).remove();
+          print("Comment with ID ${commentSnapshot.key} for post $postId deleted.");
+        }
       }
-    }
 
-    setState(() {
-      posts.removeWhere((post) => post['postId'] == postId); // Update the post list in memory
-      postComments.remove(postId); // Remove associated comments from memory
-      applySearchFilter(); // Update filtered list after deletion
-    });
+      setState(() {
+        posts.removeWhere((post) => post['postId'] == postId); // Update the post list in memory
+        postComments.remove(postId); // Remove associated comments from memory
+        applySearchFilter(); // Update filtered list after deletion
+      });
+    } catch (e) {
+      print("Error deleting post with ID $postId: $e");
+    }
   }
 
   /// Deletes a specific comment
   Future<void> deleteComment(String commentId, String postId) async {
-    await widget.dbRef.child('comments').child(commentId).remove();
-    setState(() {
-      // Update the local comments list after deletion
-      postComments[postId]?.removeWhere((comment) => comment['commentId'] == commentId);
-    });
+    try {
+      await widget.dbRef.child('comments').child(commentId).remove();
+      print("Comment with ID $commentId deleted successfully.");
+
+      setState(() {
+        // Update the local comments list after deletion
+        postComments[postId]?.removeWhere((comment) => comment['commentId'] == commentId);
+      });
+    } catch (e) {
+      print("Error deleting comment with ID $commentId: $e");
+    }
   }
 
   /// Applies the search filter to posts based on the search query
@@ -136,51 +149,53 @@ class _PostsSectionState extends State<PostsSection> {
   }
 
   /// Displays a confirmation dialog before deleting a post
-  void confirmDeletePost(String postId) {
-    showDialog(
+  Future<void> confirmDeletePost(String postId) async {
+    final bool? confirmDelete = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text("Delete Post"),
         content: Text("Are you sure you want to delete this post and its comments?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false), // Return false if cancelled
             child: Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
-              deletePost(postId);
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context, true), // Return true if confirmed
             child: Text("Delete", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmDelete == true) {
+      await deletePost(postId); // Proceed with deletion if confirmed
+    }
   }
 
   /// Displays a confirmation dialog before deleting a comment
-  void confirmDeleteComment(String commentId, String postId) {
-    showDialog(
+  Future<void> confirmDeleteComment(String commentId, String postId) async {
+    final bool? confirmDelete = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text("Delete Comment"),
         content: Text("Are you sure you want to delete this comment?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false), // Return false if cancelled
             child: Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
-              deleteComment(commentId, postId);
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context, true), // Return true if confirmed
             child: Text("Delete", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmDelete == true) {
+      await deleteComment(commentId, postId); // Proceed with deletion if confirmed
+    }
   }
 
   @override
@@ -268,22 +283,9 @@ class _PostsSectionState extends State<PostsSection> {
                               leading: Icon(Icons.comment, color: Colors.grey),
                               title: Text(comment['username'] ?? 'Anonymous'),
                               subtitle: Text(comment['content'] ?? 'No content'),
-                              trailing: IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => confirmDeleteComment(comment['commentId'], postId),
-                              ),
                             ),
                         ] else
                           Text("No comments for this post", style: TextStyle(color: Colors.grey)),
-
-                        // Delete button for post
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => confirmDeletePost(postId),
-                          ),
-                        ),
                       ],
                     ),
                   ),
