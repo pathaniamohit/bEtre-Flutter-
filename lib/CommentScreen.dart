@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,7 +5,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 
 class CommentScreen extends StatefulWidget {
   final String postId;
-  final String postOwnerId; // To know who owns the post
+  final String postOwnerId;
   final bool canReport;
 
   CommentScreen({
@@ -33,14 +32,14 @@ class _CommentScreenState extends State<CommentScreen> {
     _loadComments();
   }
 
-  /// Loads comments from the global 'comments' node where 'postId' matches
+  /// Loads comments from the 'comments' node where 'post_Id' matches
   void _loadComments() {
-    _commentsRef.orderByChild('postId').equalTo(widget.postId).onValue.listen((event) {
+    _commentsRef.orderByChild('post_Id').equalTo(widget.postId).onValue.listen((event) {
       if (event.snapshot.exists) {
         List<Map<dynamic, dynamic>> loadedComments = [];
         event.snapshot.children.forEach((comment) {
           Map<dynamic, dynamic> commentData = Map<dynamic, dynamic>.from(comment.value as Map);
-          commentData['commentId'] = comment.key;
+          commentData['commentId'] = comment.key; // Capture the comment ID
           loadedComments.add(commentData);
         });
 
@@ -55,7 +54,7 @@ class _CommentScreenState extends State<CommentScreen> {
     });
   }
 
-  /// Adds a comment to the global 'comments' node
+  /// Adds a comment to the 'comments' node
   void _addComment() async {
     if (_commentController.text.isEmpty) return;
 
@@ -68,14 +67,13 @@ class _CommentScreenState extends State<CommentScreen> {
       }
       Map<String, dynamic> userData = Map<String, dynamic>.from(userSnapshot.value as Map);
 
-      // Add comment to the global "comments" node
+      // Add comment to the "comments" node
       final newCommentRef = _commentsRef.push();
       final newComment = {
         'content': _commentController.text,
         'userId': _currentUser!.uid,
-        'postId': widget.postId, // Link comment to its post
+        'post_Id': widget.postId, // Link comment to its post
         'username': userData['username'] ?? 'Unknown',
-        'userProfileImageUrl': userData['profileImageUrl'] ?? '',
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
 
@@ -98,7 +96,6 @@ class _CommentScreenState extends State<CommentScreen> {
     if (postOwnerId == currentUserId) return; // Don't notify if the user is commenting on their own post
 
     try {
-      // Replace 'inbox' with 'notifications'
       final notificationsRef = FirebaseDatabase.instance.ref().child('notifications').child(postOwnerId);
       await notificationsRef.push().set({
         'fromUserId': currentUserId,
@@ -112,30 +109,9 @@ class _CommentScreenState extends State<CommentScreen> {
     }
   }
 
-  /// Deletes a comment from the global 'comments' node
-  void _deleteComment(Map<dynamic, dynamic> comment) async {
-    final commentUserId = comment['userId'];
-    final currentUserId = _currentUser!.uid;
-
-    // Only the comment owner or the post owner can delete the comment
-    if (currentUserId == commentUserId || currentUserId == widget.postOwnerId) {
-      try {
-        await _commentsRef.child(comment['commentId']).remove();
-        Fluttertoast.showToast(msg: 'Comment deleted successfully.', gravity: ToastGravity.BOTTOM);
-      } catch (e) {
-        Fluttertoast.showToast(msg: 'Error deleting comment: $e', gravity: ToastGravity.BOTTOM);
-      }
-    } else {
-      // Show an error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You cannot delete this comment')),
-      );
-    }
-  }
-
-  /// Reports a comment by adding it to the 'reportcomment' node
+  /// Reports a comment by adding it to the 'report_comments' node
   void _reportComment(Map<dynamic, dynamic> comment) {
-    if (!widget.canReport) return;
+    // Directly open the dialog without checking `canReport`
     showDialog(
       context: context,
       builder: (context) {
@@ -171,84 +147,35 @@ class _CommentScreenState extends State<CommentScreen> {
                 }
 
                 try {
-                  // Proceed to report the comment
+                  // Get details about the comment and the user who reported it
                   String commentId = comment['commentId'];
                   String commentOwnerId = comment['userId'];
                   String reporterId = _currentUser!.uid;
 
-                  // Check if the user has already reported this comment
-                  DataSnapshot existingReport = await FirebaseDatabase.instance
-                      .ref()
-                      .child('reportcomment')
-                      .orderByChild('reporterId')
-                      .equalTo(reporterId)
-                      .get();
+                  print("Reporting comment ID: $commentId");
+                  print("Comment owner ID: $commentOwnerId");
+                  print("Reporter ID: $reporterId");
+                  print("Reason for report: $reason");
 
-                  bool alreadyReported = false;
-                  if (existingReport.exists) {
-                    Map<dynamic, dynamic> reports = Map<dynamic, dynamic>.from(existingReport.value as Map<dynamic, dynamic>);
-                    reports.forEach((key, report) {
-                      if (report['commentId'] == commentId) {
-                        alreadyReported = true;
-                      }
-                    });
-                  }
-
-                  if (alreadyReported) {
-                    Fluttertoast.showToast(
-                      msg: 'You have already reported this comment.',
-                      toastLength: Toast.LENGTH_SHORT,
-                      gravity: ToastGravity.BOTTOM,
-                    );
-                    Navigator.pop(context);
-                    return;
-                  }
-
-                  // Fetch reporter details
-                  DataSnapshot reporterSnapshot = await _userRef.child(reporterId).get();
-                  if (!reporterSnapshot.exists) {
-                    Fluttertoast.showToast(msg: 'Reporter user does not exist.');
-                    Navigator.pop(context);
-                    return;
-                  }
-                  Map<String, dynamic> reporterData = Map<String, dynamic>.from(reporterSnapshot.value as Map);
-                  String reporterUsername = reporterData['username'] ?? 'Unknown User';
-                  String reporterEmail = reporterData['email'] ?? 'No Email';
-
-                  // Fetch comment owner details
-                  DataSnapshot commentOwnerSnapshot = await _userRef.child(commentOwnerId).get();
-                  if (!commentOwnerSnapshot.exists) {
-                    Fluttertoast.showToast(msg: 'Comment owner does not exist.');
-                    Navigator.pop(context);
-                    return;
-                  }
-                  Map<String, dynamic> commentOwnerData = Map<String, dynamic>.from(commentOwnerSnapshot.value as Map);
-                  String commentOwnerUsername = commentOwnerData['username'] ?? 'Unknown User';
-                  String commentOwnerEmail = commentOwnerData['email'] ?? 'No Email';
-
-                  // Fetch postId from comment
-                  String postId = widget.postId; // Since all comments loaded are for this post
-
-                  DatabaseReference reportRef = FirebaseDatabase.instance.ref().child('reportcomment').push();
+                  final reportRef = FirebaseDatabase.instance.ref().child('report_comments').push();
                   await reportRef.set({
                     'reportId': reportRef.key,
-                    'postId': postId, // Include postId
                     'commentId': commentId,
-                    'commentContent': comment['content'] ?? '',
-                    'commentUserId': commentOwnerId,
-                    'commentOwnerUsername': commentOwnerUsername,
-                    'commentOwnerEmail': commentOwnerEmail,
-                    'reporterId': reporterId,
-                    'reporterUsername': reporterUsername,
-                    'reporterEmail': reporterEmail,
+                    'postId': widget.postId,
+                    'content': comment['content'] ?? '',
+                    'reportedBy': reporterId,
+                    'reportedCommentUserId': commentOwnerId,
                     'reason': reason,
                     'timestamp': DateTime.now().millisecondsSinceEpoch,
+                    'status': 'pending',
                   });
 
-                  Navigator.pop(context); // Close the dialog
+                  // Close the dialog and notify the user
+                  Navigator.pop(context);
                   Fluttertoast.showToast(msg: 'Comment reported.');
                 } catch (e) {
-                  Navigator.pop(context); // Close the dialog
+                  print("Error reporting comment: $e");
+                  Navigator.pop(context);
                   Fluttertoast.showToast(msg: 'Error reporting comment: $e');
                 }
               },
@@ -260,13 +187,12 @@ class _CommentScreenState extends State<CommentScreen> {
     );
   }
 
+
   /// Builds the UI for each comment
   Widget _buildCommentListTile(Map<dynamic, dynamic> comment) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundImage: comment['userProfileImageUrl'] != null && comment['userProfileImageUrl'] != ''
-            ? NetworkImage(comment['userProfileImageUrl'])
-            : AssetImage('assets/profile_placeholder.png') as ImageProvider,
+        backgroundImage: AssetImage('assets/profile_placeholder.png') as ImageProvider,
       ),
       title: Text(comment['username'] ?? 'Unknown User'),
       subtitle: Text(comment['content']),
@@ -275,7 +201,10 @@ class _CommentScreenState extends State<CommentScreen> {
         children: [
           IconButton(
             icon: Icon(Icons.flag),
-            onPressed: () => _reportComment(comment),
+            onPressed: () {
+              print("Flag icon clicked. Opening report dialog.");
+              _reportComment(comment);
+            },
             tooltip: 'Report Comment',
           ),
           if (comment['userId'] == _currentUser!.uid || widget.postOwnerId == _currentUser!.uid)
@@ -287,6 +216,25 @@ class _CommentScreenState extends State<CommentScreen> {
         ],
       ),
     );
+  }
+
+  /// Deletes a comment from the 'comments' node
+  void _deleteComment(Map<dynamic, dynamic> comment) async {
+    final commentUserId = comment['userId'];
+    final currentUserId = _currentUser!.uid;
+
+    if (currentUserId == commentUserId || currentUserId == widget.postOwnerId) {
+      try {
+        await _commentsRef.child(comment['commentId']).remove();
+        Fluttertoast.showToast(msg: 'Comment deleted successfully.', gravity: ToastGravity.BOTTOM);
+      } catch (e) {
+        Fluttertoast.showToast(msg: 'Error deleting comment: $e', gravity: ToastGravity.BOTTOM);
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You cannot delete this comment')),
+      );
+    }
   }
 
   @override
