@@ -151,6 +151,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           String commenterUsername = await _fetchUsername(commenterId);
 
           // Verify that the post belongs to the current user
+
           final postOwnerId = (await _dbRef.child('posts').child(postId).child('userId').get()).value;
           if (postOwnerId == _user!.uid) {
             notifications.add({
@@ -217,6 +218,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// Converts timestamp to int, handling both int and double types
   int _convertTimestamp(dynamic timestamp) {
     if (timestamp == null) return 0; // Default to 0 or another appropriate value
+
     if (timestamp is int) return timestamp;
     if (timestamp is double) return timestamp.toInt();
     return 0;
@@ -235,6 +237,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     int timestamp = _convertTimestamp(notification['timestamp']);
     bool isWarning = notification['type'] == 'warning';
     bool isComment = notification['type'] == 'comment';
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
