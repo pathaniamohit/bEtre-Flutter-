@@ -28,7 +28,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     _currentUser = _auth.currentUser;
     if (_currentUser != null) {
-      _fetchFollowingUsers(); // Fetch followed users first
+      _fetchFollowingUsers();
     }
   }
 
@@ -187,30 +187,50 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _toggleLike(Map<dynamic, dynamic> post) async {
     final postId = post['postId'];
     final userId = _currentUser!.uid;
-    final likesRef = _postRef.child(postId).child('likes');
-    final userLikeRef = likesRef.child(userId);
+    final likesRef = FirebaseDatabase.instance.ref().child('likes').child(postId).child('users').child(userId);
+    final ownerIdRef = FirebaseDatabase.instance.ref().child('likes').child(postId).child('ownerId');
+    final postOwnerId = post['userId'];
 
-    final DataSnapshot snapshot = await userLikeRef.get();
-    bool isLiked = snapshot.exists;
+    print("Attempting to toggle like for post: $postId by user: $userId");
 
-    if (isLiked) {
-      // Unlike the post
-      await userLikeRef.remove();
-      // Update local post data
-      setState(() {
-        post['isLiked'] = false;
-        post['likesCount'] = (post['likesCount'] ?? 1) - 1;
-      });
-    } else {
-      // Like the post
-      await userLikeRef.set(true);
-      // Notify the post owner
-      _notifyPostOwner(post, 'liked your post');
-      // Update local post data
-      setState(() {
-        post['isLiked'] = true;
-        post['likesCount'] = (post['likesCount'] ?? 0) + 1;
-      });
+    try {
+      final DataSnapshot snapshot = await likesRef.get();
+      bool isLiked = snapshot.exists;
+      print("Like status for user $userId on post $postId: ${isLiked ? 'Liked' : 'Not liked'}");
+
+      if (isLiked) {
+        // Unlike the post
+        await likesRef.remove();
+        print("Removed like for post: $postId by user: $userId");
+
+        // Optionally update UI (if local representation of likes is needed)
+        setState(() {
+          post['isLiked'] = false;
+          post['likesCount'] = (post['likesCount'] ?? 1) - 1;
+        });
+      } else {
+        // Like the post
+        await likesRef.set({
+          'likedAt': DateTime.now().millisecondsSinceEpoch, // Save the timestamp of the like
+        });
+        print("Added like for post: $postId by user: $userId with timestamp");
+
+        // Set the ownerId for the post under likes node
+        await ownerIdRef.set(postOwnerId);
+        print("Set ownerId for post: $postId as $postOwnerId");
+
+        // Notify the post owner if necessary
+        _notifyPostOwner(post, 'liked your post');
+        print("Notification sent to post owner: $postOwnerId for like action by $userId");
+
+        // Optionally update UI (if local representation of likes is needed)
+        setState(() {
+          post['isLiked'] = true;
+          post['likesCount'] = (post['likesCount'] ?? 0) + 1;
+        });
+      }
+    } catch (error) {
+      print("Error in toggling like for post $postId by user $userId: $error");
     }
   }
 

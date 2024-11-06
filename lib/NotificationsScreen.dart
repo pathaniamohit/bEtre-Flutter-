@@ -135,11 +135,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (snapshot.exists) {
         for (var commentSnapshot in snapshot.children) {
           Map<String, dynamic> commentData = Map<String, dynamic>.from(commentSnapshot.value as Map);
-          String postId = commentData['post_Id'];
-          String commenterId = commentData['userId'];
-          String commentContent = commentData['content'];
+
+          // Use null-aware operators or default values
+          String postId = commentData['post_Id'] ?? '';
+          String commenterId = commentData['userId'] ?? '';
+          String commentContent = commentData['content'] ?? '';
           int timestamp = _convertTimestamp(commentData['timestamp']);
+
+          // Skip entries where any required field is missing or invalid
+          if (postId.isEmpty || commenterId.isEmpty || commentContent.isEmpty) {
+            print("Skipping incomplete comment data: $commentData");
+            continue;
+          }
+
           String commenterUsername = await _fetchUsername(commenterId);
+
+          // Verify that the post belongs to the current user
 
           final postOwnerId = (await _dbRef.child('posts').child(postId).child('userId').get()).value;
           if (postOwnerId == _user!.uid) {
@@ -206,10 +217,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   /// Converts timestamp to int, handling both int and double types
   int _convertTimestamp(dynamic timestamp) {
+    if (timestamp == null) return 0; // Default to 0 or another appropriate value
+
     if (timestamp is int) return timestamp;
     if (timestamp is double) return timestamp.toInt();
     return 0;
   }
+
 
   /// Formats timestamp to a readable date string
   String _formatTimestamp(int timestamp) {
@@ -222,6 +236,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     String message = notification['message'];
     int timestamp = _convertTimestamp(notification['timestamp']);
     bool isWarning = notification['type'] == 'warning';
+    bool isComment = notification['type'] == 'comment';
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -248,11 +264,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               : CircleAvatar(
             backgroundImage: AssetImage('assets/profile_placeholder.png'),
           ),
-          title: Text(
-            message,
-            style: TextStyle(
-              fontWeight: isWarning ? FontWeight.bold : FontWeight.normal,
-              color: isWarning ? Colors.red : Colors.black,
+          title: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: isComment
+                      ? message.split(': ')[0] + ': ' // Username part
+                      : message, // Full message for non-comment notifications
+                  style: TextStyle(
+                    fontWeight: isWarning ? FontWeight.bold : FontWeight.normal,
+                    color: isWarning ? Colors.red : Colors.black,
+                  ),
+                ),
+                if (isComment)
+                  TextSpan(
+                    text: message.split(': ').length > 1 ? message.split(': ')[1] : "",
+                    style: TextStyle(
+                      color: Colors.blue, // Comment content in blue color
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+              ],
             ),
           ),
           subtitle: Text(
