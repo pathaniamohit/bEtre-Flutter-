@@ -85,15 +85,58 @@ class _ReportsSectionState extends State<ReportsSection> {
   }
 
   void handleWarning(Report report) async {
+    // Show a dialog to input custom reason
+    TextEditingController reasonController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Issue Warning"),
+          content: TextField(
+            controller: reasonController,
+            decoration: InputDecoration(
+              labelText: "Enter warning reason",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Proceed to issue warning with the provided reason
+                Navigator.of(context).pop(); // Close dialog
+                await issueWarning(report, reasonController.text);
+              },
+              child: Text("Submit"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> issueWarning(Report report, String customReason) async {
     try {
       // Ensure reportedBy field is not null
       if (report.reportedBy != null) {
-        String warningId = widget.dbRef.child("warnings").child(report.reportedBy!).push().key!;
+        String warningId =
+        widget.dbRef.child("warnings").child(report.reportedBy!).push().key!;
 
-        // Add the warning in the "warnings" node
-        await widget.dbRef.child("warnings").child(report.reportedBy!).child(warningId).set({
+        // Add the warning in the "warnings" node with custom reason
+        await widget.dbRef
+            .child("warnings")
+            .child(report.reportedBy!)
+            .child(warningId)
+            .set({
           "userId": report.reportedBy!,
-          "reason": report.reason ?? "No reason provided",
+          "reason": customReason.isNotEmpty
+              ? customReason
+              : (report.reason ?? "No reason provided"),
           "timestamp": DateTime.now().millisecondsSinceEpoch,
         });
         print("Warning added for user ${report.reportedBy}.");
@@ -116,9 +159,9 @@ class _ReportsSectionState extends State<ReportsSection> {
 
   void handleDiscard(Report report) async {
     try {
-      // Update the report's status to "resolved" in the "reports" node
-      await widget.dbRef.child("reports").child(report.id).update({"status": "resolved"});
-      print("Report discarded (status set to 'resolved').");
+      // Remove the report from "reports" node
+      await widget.dbRef.child("reports").child(report.id).remove();
+      print("Report discarded and removed from 'reports' node.");
 
       Fluttertoast.showToast(msg: "Report discarded.");
       loadReports(); // Refresh reports after discarding
@@ -139,7 +182,9 @@ class _ReportsSectionState extends State<ReportsSection> {
         itemBuilder: (context, index) {
           final report = reports[index];
           final postId = report.postId;
-          final imageUrl = postId != null && postImages.containsKey(postId) && postImages[postId]!.isNotEmpty
+          final imageUrl = postId != null &&
+              postImages.containsKey(postId) &&
+              postImages[postId]!.isNotEmpty
               ? postImages[postId]!
               : null;
 
@@ -154,12 +199,14 @@ class _ReportsSectionState extends State<ReportsSection> {
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Text('Image not available'),
+                    errorBuilder: (context, error, stackTrace) =>
+                        Text('Image not available'),
                   ),
                 Text("Reason: ${report.reason ?? 'N/A'}"),
                 Text("Content: ${report.content ?? 'N/A'}"),
                 Text("Reported by: ${report.reportedBy ?? 'Unknown'}"),
-                Text("Timestamp: ${DateTime.fromMillisecondsSinceEpoch(report.timestamp ?? 0).toString()}"), // Defaulting to 0 if null
+                Text(
+                    "Timestamp: ${DateTime.fromMillisecondsSinceEpoch(report.timestamp ?? 0).toString()}"),
               ],
             ),
             trailing: PopupMenuButton<String>(
@@ -206,14 +253,16 @@ class Report {
 
   // Factory constructor to create a Report object from a DataSnapshot
   factory Report.fromSnapshot(DataSnapshot snapshot, String type) {
-    print("Creating Report object from snapshot for type: $type, ID: ${snapshot.key}");
+    print(
+        "Creating Report object from snapshot for type: $type, ID: ${snapshot.key}");
     return Report(
       id: snapshot.key!,
       type: type,
       postId: snapshot.child("postId").value as String?,
       content: snapshot.child("content").value as String?,
       reason: snapshot.child("reason").value as String?,
-      timestamp: (snapshot.child("timestamp").value as num?)?.toInt() ?? 0, // Defaulting to 0 if null
+      timestamp:
+      (snapshot.child("timestamp").value as num?)?.toInt() ?? 0, // Defaulting to 0 if null
       reportedBy: snapshot.child("reportedBy").value as String?,
     );
   }
