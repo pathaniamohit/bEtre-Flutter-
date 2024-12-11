@@ -4,6 +4,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'UserAnalytics.dart';
 
 class UsersSection extends StatefulWidget {
   final DatabaseReference dbRef;
@@ -180,7 +181,22 @@ class _UsersSectionState extends State<UsersSection> {
                       backgroundColor: isOnline ? Colors.green : Colors.grey,
                       radius: 6,
                     ),
-                    title: Text(userData['username'] ?? 'Unknown'),
+                    title: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserAnalytics(userId: entry.key),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        userData['username'] ?? 'Unknown',
+                        style: const TextStyle(
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
                     subtitle: Text(userData['email'] ?? 'No email'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
